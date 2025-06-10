@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 // 暴露给渲染进程的 API
 contextBridge.exposeInMainWorld('electron', {
+  // App lifecycle
+  onReady: (callback: () => void) => ipcRenderer.on('app:ready', callback),
+  
   // Shortcut related
   getShortcuts: () => ipcRenderer.invoke('shortcuts:get'),
   updateShortcut: (action: string, config: any) => ipcRenderer.invoke('shortcuts:update', action, config),
@@ -9,12 +12,19 @@ contextBridge.exposeInMainWorld('electron', {
   // Audio recording related
   startRecording: () => ipcRenderer.invoke('audio:start'),
   stopRecording: () => ipcRenderer.invoke('audio:stop'),
-  pauseRecording: () => ipcRenderer.invoke('audio:pause'),
-  resumeRecording: () => ipcRenderer.invoke('audio:resume'),
   cancelRecording: () => ipcRenderer.invoke('audio:cancel'),
   getRecordingStatus: () => ipcRenderer.invoke('audio:getStatus'),
   updateAudioConfig: (config: any) => ipcRenderer.invoke('audio:updateConfig', config),
+  deleteAudioFile: (audioPath: string) => ipcRenderer.invoke('audio:deleteFile', audioPath),
+  getCurrentRecordingTask: () => ipcRenderer.invoke('task:getCurrentRecording'),
 
   // App control
   quitApp: () => ipcRenderer.invoke('app:quit'),
+
+  // Task related
+  createTask: (title: string, status: string) => ipcRenderer.invoke('task:create', title, status),
+  updateTask: (id: string, updates: any) => ipcRenderer.invoke('task:update', id, updates),
+  getAllTasks: () => ipcRenderer.invoke('task:getAll'),
+  deleteTask: (id: string) => ipcRenderer.invoke('task:delete', id),
+  openAudioFile: (audioPath: string) => ipcRenderer.invoke('task:openAudioFile', audioPath),
 }); 
