@@ -3,16 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import * as record from 'node-record-lpcm16';
-
-/**
- * Audio recording configuration interface
- */
-interface AudioConfig {
-  format: 'wav' | 'mp3';
-  sampleRate: number;
-  channels: number;
-  bitRate: number;
-}
+import type { AudioConfig } from '../renderer/types/audio';
 
 /**
  * Default audio recording configuration
@@ -20,9 +11,15 @@ interface AudioConfig {
 const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   format: 'wav',
   sampleRate: 44100,
-  channels: 1,
-  bitRate: 128000,
+  channels: 2,
+  bitDepth: 16
 };
+
+interface RecordingResult {
+  success: boolean;
+  path?: string;
+  error?: string;
+}
 
 /**
  * AudioRecorder class handles all audio recording operations
@@ -40,67 +37,120 @@ export class AudioRecorder {
 
   /**
    * Start recording audio
-   * @returns {Promise<string>} Path to the recorded audio file
+   * @returns {Promise<RecordingResult>} Result of the recording operation
    */
-  async startRecording(): Promise<string> {
+  async startRecording(): Promise<RecordingResult> {
+    console.log('AudioRecorder.startRecording() called');
+    console.log('Current state:', { isRecording: this.isRecording, currentRecordingPath: this.currentRecordingPath });
+
     if (this.isRecording) {
-      throw new Error('Recording is already in progress');
+      console.log('Recording already in progress');
+      return { success: false, error: 'Recording is already in progress' };
     }
 
-    const tempDir = path.join(app.getPath('temp'), 'whisper-electron');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
+    try {
+      const tempDir = path.join(app.getPath('temp'), 'whisper-electron');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `recording-${timestamp}.wav`;
+      this.currentRecordingPath = path.join(tempDir, filename);
+
+      console.log('Starting recording to:', this.currentRecordingPath);
+
+      // Start recording using node-record-lpcm16
+      this.fileStream = fs.createWriteStream(this.currentRecordingPath, { encoding: 'binary' });
+      this.recInstance = record.record({
+        sampleRate: this.config.sampleRate,
+        channels: this.config.channels,
+        threshold: 0,
+        verbose: false,
+        recordProgram: 'sox', // Try 'sox' first, fallback to 'rec' or 'arecord' if needed
+        audioType: 'wav',
+      });
+
+      this.recInstance
+        .stream()
+        .on('error', (err: Error) => {
+          console.error('Recording error:', err);
+          this.isRecording = false;
+        })
+        .pipe(this.fileStream);
+
+      this.isRecording = true;
+      console.log('Recording started successfully');
+
+      return { success: true, path: this.currentRecordingPath };
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      // 确保在出错时重置状态
+      this.isRecording = false;
+      this.currentRecordingPath = null;
+      if (this.recInstance) {
+        try {
+          this.recInstance.stop();
+        } catch (e) {
+          console.error('Error stopping recording instance after error:', e);
+        }
+        this.recInstance = null;
+      }
+      if (this.fileStream) {
+        try {
+          this.fileStream.end();
+        } catch (e) {
+          console.error('Error closing file stream after error:', e);
+        }
+        this.fileStream = null;
+      }
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `recording-${timestamp}.wav`;
-    this.currentRecordingPath = path.join(tempDir, filename);
-
-    // Start recording using node-record-lpcm16
-    this.fileStream = fs.createWriteStream(this.currentRecordingPath, { encoding: 'binary' });
-    this.recInstance = record.record({
-      sampleRate: this.config.sampleRate,
-      channels: this.config.channels,
-      threshold: 0,
-      verbose: false,
-      recordProgram: 'sox', // Try 'sox' first, fallback to 'rec' or 'arecord' if needed
-      audioType: 'wav',
-    });
-    this.recInstance
-      .stream()
-      .on('error', (err: Error) => {
-        console.error('Recording error:', err);
-      })
-      .pipe(this.fileStream);
-
-    this.isRecording = true;
-
-    return this.currentRecordingPath;
   }
 
   /**
    * Stop the current recording
-   * @returns {Promise<string>} Path to the recorded audio file
+   * @returns {Promise<RecordingResult>} Result of the recording operation
    */
-  async stopRecording(): Promise<string> {
+  async stopRecording(): Promise<RecordingResult> {
+    console.log('AudioRecorder.stopRecording() called');
+    console.log('Current state:', { isRecording: this.isRecording, currentRecordingPath: this.currentRecordingPath });
+
     if (!this.isRecording) {
-      throw new Error('No recording in progress');
+      console.log('No recording in progress');
+      return { success: false, error: 'No recording in progress' };
     }
     if (!this.currentRecordingPath) {
-      throw new Error('No recording path found');
+      console.log('No recording path found');
+      return { success: false, error: 'No recording path found' };
     }
-    if (this.recInstance) {
-      this.recInstance.stop();
-      this.recInstance = null;
+
+    try {
+      console.log('Stopping recording instance...');
+      if (this.recInstance) {
+        this.recInstance.stop();
+        this.recInstance = null;
+      }
+      if (this.fileStream) {
+        this.fileStream.end();
+        this.fileStream = null;
+      }
+      this.isRecording = false;
+      const recordingPath = this.currentRecordingPath;
+      this.currentRecordingPath = null;
+
+      console.log('Recording stopped successfully');
+      return { success: true, path: recordingPath };
+    } catch (error) {
+      console.error('Error stopping recording:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
-    if (this.fileStream) {
-      this.fileStream.end();
-      this.fileStream = null;
-    }
-    this.isRecording = false;
-    const recordingPath = this.currentRecordingPath;
-    this.currentRecordingPath = null;
-    return recordingPath;
   }
 
   /**
@@ -129,6 +179,7 @@ export class AudioRecorder {
    * Get the current recording status
    */
   getStatus(): { isRecording: boolean } {
+    console.log('Getting recording status:', { isRecording: this.isRecording });
     return {
       isRecording: this.isRecording,
     };
@@ -139,12 +190,12 @@ export class AudioRecorder {
    * @param config Partial configuration to update
    */
   updateConfig(config: Partial<AudioConfig>): void {
+    console.log('Updating audio config:', config);
     this.config = { ...this.config, ...config };
   }
 }
 
-// Create a singleton instance
-let audioRecorder: AudioRecorder | null = null;
+export let audioRecorder: AudioRecorder | null = null;
 
 /**
  * Initialize the audio recorder
@@ -165,18 +216,45 @@ export function setupAudioIPC(): void {
 
   ipcMain.handle('audio:start', async () => {
     try {
-      const recordingPath = await audioRecorder!.startRecording();
-      return { success: true, path: recordingPath };
+      if (!audioRecorder) {
+        return { success: false, error: 'Audio recorder not initialized' };
+      }
+
+      // 开始录音
+      const result = await audioRecorder.startRecording();
+      console.log('Start recording result:', result);
+      
+      return result;
     } catch (error: unknown) {
+      console.error('Error in audio:start handler:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   });
 
   ipcMain.handle('audio:stop', async () => {
     try {
-      const recordingPath = await audioRecorder!.stopRecording();
-      return { success: true, path: recordingPath };
+      console.log('Stopping recording...');
+      
+      if (!audioRecorder) {
+        console.error('Audio recorder not initialized');
+        return { success: false, error: 'Audio recorder not initialized' };
+      }
+
+      // 停止录音
+      console.log('Calling audioRecorder.stopRecording()...');
+      const result = await audioRecorder.stopRecording();
+      console.log('Stop recording result:', result);
+      
+      // 获取最新的录音状态
+      const status = audioRecorder.getStatus();
+      console.log('Current recording status:', status);
+      
+      return {
+        ...result,
+        isRecording: status.isRecording
+      };
     } catch (error: unknown) {
+      console.error('Error in audio:stop handler:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   });
@@ -198,6 +276,18 @@ export function setupAudioIPC(): void {
     try {
       audioRecorder!.updateConfig(config);
       return { success: true };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+
+  ipcMain.handle('audio:deleteFile', async (_: unknown, audioPath: string) => {
+    try {
+      if (fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
+        return { success: true };
+      }
+      return { success: false, error: 'File not found' };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }

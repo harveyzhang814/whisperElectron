@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ShortcutSettings } from './components/ShortcutSettings';
+import { TaskList } from './components/TaskList';
+import { useTasks } from './hooks/useTasks';
+import { useRecordingTask } from './hooks/useRecordingTask';
 import './App.css';
 
 interface RecordingStatus {
@@ -11,13 +14,15 @@ const App: React.FC = () => {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({
     isRecording: false,
   });
+  const { refreshTasks } = useTasks();
+  const { setCurrentRecordingTask, currentTask, loadCurrentTask, getCurrentRecordingTaskId } = useRecordingTask();
 
   useEffect(() => {
-    // Poll recording status every second
+    // Poll recording status every 500ms
     const statusInterval = setInterval(async () => {
       const status = await window.electron.getRecordingStatus();
       setRecordingStatus(status);
-    }, 1000);
+    }, 500);
 
     return () => clearInterval(statusInterval);
   }, []);
@@ -28,22 +33,50 @@ const App: React.FC = () => {
 
   const handleStartRecording = async () => {
     try {
+      // First create a task
+      const now = new Date().toISOString();
+      const title = `Recording-${now}`;
+      const taskResult = await window.electron.createTask(title, 'recording');
+      console.log('Recording task created:', taskResult);
+      
+      // Set as current recording task
+      await setCurrentRecordingTask(taskResult.id);
+      refreshTasks();
+
+      // Then start recording
       const result = await window.electron.startRecording();
-      if (result.success) {
-        console.log('Recording started:', result.path);
-      } else {
+      if (!result.success) {
+        // If recording fails, update the task status back to backlog
+        await window.electron.updateTask(taskResult.id, { status: 'backlog' });
+        await setCurrentRecordingTask(null);
+        refreshTasks();
         console.error('Failed to start recording:', result.error);
       }
     } catch (error) {
       console.error('Error starting recording:', error);
+      refreshTasks();
     }
   };
 
   const handleStopRecording = async () => {
     try {
       const result = await window.electron.stopRecording();
-      if (result.success) {
-        console.log('Recording stopped:', result.path);
+      console.log('Stop recording result:', result);
+      
+      // 重新获取最新的任务状态
+      await loadCurrentTask();
+      const currentTaskId = getCurrentRecordingTaskId();
+      
+      if (result.success && currentTaskId) {
+        // 如果停止成功，更新任务状态
+        await window.electron.updateTask(currentTaskId, { 
+          status: 'completed',
+          audioPath: result.path
+        });
+        await setCurrentRecordingTask(null);
+        const status = await window.electron.getRecordingStatus();
+        setRecordingStatus(status);
+        refreshTasks();
       } else {
         console.error('Failed to stop recording:', result.error);
       }
@@ -55,11 +88,33 @@ const App: React.FC = () => {
   const handleCancelRecording = async () => {
     try {
       const result = await window.electron.cancelRecording();
+      
+      // 重新获取最新的任务状态
+      await loadCurrentTask();
+      const currentTaskId = getCurrentRecordingTaskId();
+      
+      if (currentTaskId) {
+        await window.electron.updateTask(currentTaskId, { status: 'backlog' });
+        await setCurrentRecordingTask(null);
+      }
       if (!result.success) {
         console.error('Failed to cancel recording:', result.error);
       }
+      refreshTasks();
     } catch (error) {
       console.error('Error canceling recording:', error);
+    }
+  };
+
+  const handleCreateMemoTask = async () => {
+    try {
+      const now = new Date().toISOString();
+      const title = `备忘录-${now}`;
+      const result = await window.electron.createTask(title, 'backlog');
+      console.log('Memo task created:', result);
+      refreshTasks();
+    } catch (error) {
+      console.error('Error creating memo task:', error);
     }
   };
 
@@ -76,12 +131,20 @@ const App: React.FC = () => {
       <header className="toolbar">
         <div className="recording-controls">
           {!recordingStatus.isRecording ? (
-            <button 
-              className="record-button"
-              onClick={handleStartRecording}
-            >
-              Start Recording
-            </button>
+            <>
+              <button 
+                className="record-button"
+                onClick={handleStartRecording}
+              >
+                Start Recording
+              </button>
+              <button 
+                className="memo-button"
+                onClick={handleCreateMemoTask}
+              >
+                Create Memo Task
+              </button>
+            </>
           ) : (
             <>
               <button 
@@ -122,10 +185,7 @@ const App: React.FC = () => {
           <h2>Recent Recordings</h2>
         </div>
         <div className="task-items">
-          {/* Task items will be rendered here */}
-          <div className="empty-state">
-            No recordings yet. Press the record button to start.
-          </div>
+          <TaskList />
         </div>
       </main>
 

@@ -6,8 +6,17 @@
     "module": "commonjs",
     "target": "ES2020",
     "lib": ["ES2020"],
-    "rootDir": "src/main",
-    "esModuleInterop": true
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "*": ["src/*"]
+    },
+    "allowSyntheticDefaultImports": true
   },
-  "include": ["src/main"]
+  "include": [
+    "src/main/**/*",
+    "src/renderer/types/**/*"
+  ]
 } 
