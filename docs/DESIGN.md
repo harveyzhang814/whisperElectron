@@ -63,59 +63,331 @@ WhisperElectron 是一个基于 Electron 和 React 的桌面应用，主要用�
 
 ### 1. 快捷键监听模块
 
-#### 系统级快捷键实现
-- **使用 Electron 官方 globalShortcut 模块，跨平台支持全局快捷键监听。无需 node-global-key-listener 或本地二进制依赖。**
-- 支持在应用最小化或后台运行时捕获快捷键
-- 只能监听组合键（如 CommandOrControl+Shift+S），不能监听单独修饰键
-- 快捷键注册失败时（如被系统或其他应用占用）有日志提示
+#### 核心类设计
 
-#### 快捷键动作类型
-- START_RECORDING: 开始录音
-- STOP_RECORDING: 停止录音
-- CANCEL_RECORDING: 取消录音
+##### ShortcutManager 类
+```typescript
+class ShortcutManager {
+  private shortcuts: Map<ShortcutAction, ShortcutConfig>;
+  private isRecording: boolean;
+}
+```
 
-#### 快捷键配置
-- 每个快捷键包含：**唯一 action id**、快捷键组合、描述、启用状态
-- 支持动态更新快捷键配置
-- 支持启用/禁用单个快捷键
-- 配置持久化存储（后续可扩展）
+#### 配置接口
+```typescript
+interface ShortcutConfig {
+  action: ShortcutAction;    // 快捷键动作
+  key: string;              // 快捷键组合
+  description: string;      // 描述
+  enabled: boolean;         // 是否启用
+}
 
-#### 状态管理
-- 维护录音状态（是否正在录音）
-- 确保快捷键动作在正确的状态下触发
-- 提供状态重置功能
+enum ShortcutAction {
+  START_RECORDING = 'START_RECORDING',
+  STOP_RECORDING = 'STOP_RECORDING',
+  CANCEL_RECORDING = 'CANCEL_RECORDING',
+}
+```
 
-#### 权限处理
-- **macOS 下无需额外辅助功能权限，只需 Electron 主进程在即可监听全局快捷键**
+#### 核心功能实现
 
-#### 错误处理和恢复机制
-- 处理快捷键冲突（同一组合键只能被一个 action 占用）
-- 注册失败有日志提示
-- 处理系统休眠/唤醒后的重新初始化
+1. **快捷键管理**
+   - `initializeShortcuts()`: 初始化快捷键配置
+     - 加载默认配置
+     - 注册启用的快捷键
+   
+   - `registerAllShortcuts()`: 注册所有启用的快捷键
+     - 先注销所有快捷键
+     - 重新注册启用状态的快捷键
+   
+   - `updateShortcut()`: 更新快捷键配置
+     - 检查快捷键冲突
+     - 注销旧快捷键
+     - 注册新快捷键
+     - 更新配置状态
+
+2. **默认配置**
+   ```typescript
+   const DEFAULT_SHORTCUTS = [
+     {
+       action: ShortcutAction.START_RECORDING,
+       key: 'CommandOrControl+Shift+R',
+       description: '开始录音',
+       enabled: true,
+     },
+     {
+       action: ShortcutAction.STOP_RECORDING,
+       key: 'CommandOrControl+Shift+S',
+       description: '停止录音',
+       enabled: true,
+     },
+     {
+       action: ShortcutAction.CANCEL_RECORDING,
+       key: 'CommandOrControl+Shift+C',
+       description: '取消录音',
+       enabled: true,
+     },
+   ];
+   ```
+
+3. **状态管理**
+   - 维护录音状态
+   - 快捷键配置状态
+   - 快捷键注册状态
+   - 冲突检测状态
+
+4. **事件处理**
+   - 快捷键触发事件处理
+   - 状态变更通知
+   - 错误处理和恢复
+
+#### 进程通信设计
+
+1. **IPC 通道**
+   ```typescript
+   // 主进程
+   ipcMain.handle('shortcuts:get', () => {...});
+   ipcMain.handle('shortcuts:update', (_, action, config) => {...});
+   ```
+
+2. **渲染进程 API**
+   ```typescript
+   window.electron = {
+     getShortcuts: () => ipcRenderer.invoke('shortcuts:get'),
+     updateShortcut: (action, config) => ipcRenderer.invoke('shortcuts:update', action, config)
+   };
+   ```
+
+#### 用户界面设计
+
+1. **快捷键设置组件**
+   - 显示所有可配置的快捷键
+   - 支持快捷键修改
+   - 支持启用/禁用切换
+   - 实时预览和反馈
+
+2. **交互设计**
+   - 点击开始录制快捷键
+   - 等待用户按下新组合键
+   - 显示录制状态
+   - 保存并应用新快捷键
+
+#### 错误处理机制
+
+1. **注册错误**
+   - 快捷键被占用
+   - 无效的快捷键组合
+   - 注册失败恢复
+
+2. **冲突处理**
+   - 检测快捷键冲突
+   - 阻止重复注册
+   - 提供冲突反馈
+
+#### 生命周期管理
+
+1. **初始化**
+   - 应用启动时初始化
+   - 加载默认配置
+   - 注册可用快捷键
+
+2. **清理**
+   - 应用退出时注销所有快捷键
+   - 保存配置状态
+   - 释放资源
 
 #### 性能优化
-- Electron globalShortcut 本身已做优化
-- 只注册启用状态的快捷键，动态注册/注销
+
+1. **资源管理**
+   - 及时注销未使用的快捷键
+   - 避免重复注册
+   - 优化状态更新
+
+2. **状态同步**
+   - 使用 Map 结构提高查询效率
+   - 原子操作确保状态一致性
+   - 异步操作的正确处理
+
+#### 安全考虑
+
+1. **权限管理**
+   - 使用 Electron globalShortcut 模块
+   - 无需额外的系统权限
+   - 安全的快捷键注册机制
+
+2. **数据保护**
+   - 安全的配置存储
+   - 防止快捷键冲突
+   - 用户配置的保护
+
+#### 扩展性设计
+
+1. **动作支持**
+   - 可扩展的快捷键动作
+   - 灵活的配置接口
+   - 支持自定义动作
+
+2. **平台兼容**
+   - 跨平台快捷键支持
+   - 平台特定的快捷键映射
+   - 可配置的按键组合
 
 ### 2. 录音模块
 
-#### 录音配置
-- 音频格式：WAV/MP3
-- 采样率：44.1kHz/48kHz
-- 声道数：单声道/立体声
-- 比特率：128kbps/256kbps
+#### 核心类设计
 
-#### 核心功能
-- 音频录制
-- 格式转换
-- 临时文件管理
-- 录音状态管理
+##### AudioRecorder 类
+```typescript
+class AudioRecorder {
+  private isRecording: boolean;
+  private currentRecordingPath: string | null;
+  private config: AudioConfig;
+  private fileStream: WriteStream | null;
+  private recInstance: any;
+}
+```
 
-#### 文件管理
-- 临时文件存储
-- 自动清理机制
-- 文件命名规则
-- 存储位置配置
+#### 配置接口
+```typescript
+interface AudioConfig {
+  format: 'wav' | 'mp3';      // 音频格式
+  sampleRate: number;         // 采样率 (默认 44100Hz)
+  channels: number;          // 声道数 (默认 2)
+  bitDepth: number;         // 位深度 (默认 16)
+}
+```
+
+#### 核心功能实现
+
+1. **录音控制**
+   - `startRecording()`: 开始录音
+     - 检查是否已在录音
+     - 创建临时文件目录
+     - 生成唯一文件名
+     - 初始化录音实例
+     - 创建文件写入流
+     - 错误处理和状态管理
+   
+   - `stopRecording()`: 停止录音
+     - 停止录音实例
+     - 关闭文件流
+     - 重置状态
+     - 返回录音文件路径
+   
+   - `cancelRecording()`: 取消录音
+     - 停止录音
+     - 删除临时文件
+     - 重置状态
+
+2. **配置管理**
+   - `updateConfig()`: 更新录音配置
+   - 默认配置：
+     ```typescript
+     const DEFAULT_AUDIO_CONFIG = {
+       format: 'wav',
+       sampleRate: 44100,
+       channels: 2,
+       bitDepth: 16
+     };
+     ```
+
+3. **状态管理**
+   - `getStatus()`: 获取当前录音状态
+   - 状态包含：
+     - isRecording: 是否正在录音
+     - currentRecordingPath: 当前录音文件路径
+
+4. **文件管理**
+   - 临时文件存储：`app.getPath('temp')/whisper-electron/`
+   - 文件命名格式：`recording-{timestamp}.wav`
+   - 自动清理机制：任务删除时自动删除对应音频文件
+
+#### 进程通信设计
+
+1. **IPC 通道**
+   ```typescript
+   // 主进程到渲染进程
+   ipcMain.handle('audio:start', async () => {...});
+   ipcMain.handle('audio:stop', async () => {...});
+   ipcMain.handle('audio:cancel', async () => {...});
+   ipcMain.handle('audio:getStatus', () => {...});
+   ipcMain.handle('audio:updateConfig', (_, config) => {...});
+   ipcMain.handle('audio:deleteFile', async (_, audioPath) => {...});
+   ```
+
+2. **渲染进程 API**
+   ```typescript
+   window.electron = {
+     startRecording: () => ipcRenderer.invoke('audio:start'),
+     stopRecording: () => ipcRenderer.invoke('audio:stop'),
+     cancelRecording: () => ipcRenderer.invoke('audio:cancel'),
+     getRecordingStatus: () => ipcRenderer.invoke('audio:getStatus'),
+     updateAudioConfig: (config) => ipcRenderer.invoke('audio:updateConfig', config),
+     deleteAudioFile: (audioPath) => ipcRenderer.invoke('audio:deleteFile', audioPath)
+   };
+   ```
+
+#### 错误处理机制
+
+1. **录音错误**
+   - 设备权限错误
+   - 文件系统错误
+   - 录音设备错误
+   - 状态不一致错误
+
+2. **恢复机制**
+   - 错误发生时自动清理资源
+   - 重置录音状态
+   - 删除不完整的临时文件
+   - 通知用户错误信息
+
+#### 与任务管理的集成
+
+1. **任务状态同步**
+   - 开始录音时创建或更新任务
+   - 停止录音时更新任务状态和音频路径
+   - 取消录音时重置任务状态
+
+2. **生命周期管理**
+   - 应用退出时自动停止录音
+   - 窗口关闭时保存录音
+   - 任务删除时清理音频文件
+
+#### 性能优化
+
+1. **资源管理**
+   - 使用流式处理避免内存溢出
+   - 及时释放不需要的资源
+   - 自动清理临时文件
+
+2. **状态同步**
+   - 使用原子操作确保状态一致性
+   - 避免竞态条件
+   - 异步操作的正确处理
+
+#### 安全考虑
+
+1. **文件安全**
+   - 使用安全的临时目录
+   - 唯一文件名生成
+   - 适当的文件权限设置
+
+2. **数据保护**
+   - 录音文件的安全存储
+   - 临时文件的及时清理
+   - 用户数据的保护
+
+#### 扩展性设计
+
+1. **格式支持**
+   - 当前支持 WAV 格式
+   - 预留 MP3 格式支持
+   - 可扩展的音频配置接口
+
+2. **设备支持**
+   - 支持多种录音程序（sox, rec, arecord）
+   - 可配置的设备选择
+   - 跨平台兼容性
 
 ### 3. API 通信模块
 
