@@ -2,7 +2,7 @@
   "name": "whisper-electron",
   "version": "1.0.0",
   "description": "A desktop application for audio recording and transcription using Whisper API",
-  "main": "dist/main/index.js",
+  "main": ".vite/main/main.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",

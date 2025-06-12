@@ -6,6 +6,7 @@ node_modules/
 # Production build
 build/
 out/
+.vite/
 
 # IDE and editor files
 .vscode/

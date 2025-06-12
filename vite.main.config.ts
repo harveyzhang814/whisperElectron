@@ -8,16 +8,27 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist/main',
+    outDir: '.vite/main',
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        index: resolve(__dirname, 'src/main/index.ts'),
+        main: resolve(__dirname, 'src/main/index.ts'),
       },
       output: {
-        entryFileNames: '[name].js',
+        entryFileNames: 'main.js',
       },
+      external: [
+        'sqlite3',
+        'fluent-ffmpeg',
+        'node-record-lpcm16',
+        'node-global-key-listener',
+        'electron',
+        /^node:/
+      ]
     },
+  },
+  optimizeDeps: {
+    exclude: ['sqlite3', 'fluent-ffmpeg', 'node-record-lpcm16', 'node-global-key-listener']
   },
   base: './',
 }); 

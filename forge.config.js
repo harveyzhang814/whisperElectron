@@ -27,6 +27,10 @@ module.exports = {
       config: {
         build: [
           {
+            entry: 'src/main/index.ts',
+            config: 'vite.main.config.ts',
+          },
+          {
             entry: 'src/preload.ts',
             config: 'vite.preload.config.ts',
           },

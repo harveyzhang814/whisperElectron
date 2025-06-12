@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   build: {
-    outDir: 'dist/main',
+    outDir: '.vite/main',
     emptyOutDir: false,
     lib: {
       entry: 'src/preload.ts',
@@ -13,6 +13,10 @@ export default defineConfig({
       output: {
         entryFileNames: 'preload.js',
       },
+      external: [
+        'electron',
+        /^node:/
+      ]
     },
   },
 }); 
