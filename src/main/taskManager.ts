@@ -1,7 +1,7 @@
 // This module manages recording tasks using SQLite for persistence.
 // It provides CRUD operations and task state transitions for the WhisperElectron app.
 
-import { app, ipcMain, shell } from 'electron';
+import { app, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as sqlite3 from 'sqlite3';
@@ -33,34 +33,6 @@ export function initializeTaskManager() {
     audioPath TEXT,
     duration INTEGER
   )`);
-
-  // Register IPC handlers
-  ipcMain.handle('task:create', async (_, title: string, status: Task['status']) => {
-    return await TaskManager.createTask(title, status);
-  });
-
-  ipcMain.handle('task:update', async (_, id: string, updates: Partial<Task>) => {
-    await TaskManager.updateTask(id, updates);
-    return { success: true };
-  });
-
-  ipcMain.handle('task:getAll', async () => {
-    return await TaskManager.getAllTasks();
-  });
-
-  ipcMain.handle('task:delete', async (_, id: string) => {
-    await TaskManager.deleteTask(id);
-    return { success: true };
-  });
-
-  ipcMain.handle('task:openAudioFile', async (_, audioPath: string) => {
-    TaskManager.openAudioFile(audioPath);
-    return { success: true };
-  });
-
-  ipcMain.handle('task:getCurrentRecording', async () => {
-    return await TaskManager.getCurrentRecordingTask();
-  });
 }
 
 // CRUD and task logic

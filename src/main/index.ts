@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { ShortcutManager } from './shortcut';
 import { initializeAudioRecorder, setupAudioIPC, audioRecorder } from './audio';
 import { initializeTaskManager, TaskManager } from './taskManager';
+import { initializeIPC } from './ipc';
 
 let shortcutManager: ShortcutManager | null = null;
 let isQuitting = false;
@@ -50,28 +51,8 @@ async function initializeShortcutManager() {
   // 已迁移为 globalShortcut，无需辅助功能权限检查
 }
 
-// 设置 IPC 通信
-function setupIPC() {
-  // 获取所有快捷键配置
-  ipcMain.handle('shortcuts:get', () => {
-    return shortcutManager?.getShortcuts() || [];
-  });
-
-  // 更新快捷键配置（用 action 作为唯一标识）
-  ipcMain.handle('shortcuts:update', (_, action: string, config: any) => {
-    shortcutManager?.updateShortcut(action as import('./shortcut').ShortcutAction, config);
-  });
-
-  // 添加退出应用的 IPC 处理
-  ipcMain.handle('app:quit', async () => {
-    await quitApp();
-  });
-
-  // 任务相关的 IPC 处理器已经在 taskManager.ts 中注册
-}
-
 // 退出应用
-async function quitApp() {
+export async function quitApp() {
   isQuitting = true;
   
   // 如果有正在进行的录音，先停止
@@ -97,15 +78,21 @@ async function quitApp() {
 }
 
 app.whenReady().then(async () => {
-  // 先初始化录音器和任务管理器
+  // 先初始化录音器
   initializeAudioRecorder();
+
+  // 初始化任务管理器
   initializeTaskManager();
   setupAudioIPC();
 
   // 然后创建窗口和设置快捷键
   const mainWindow = createWindow();
   await initializeShortcutManager();
-  setupIPC();
+  
+  // 初始化 IPC 通信
+  if (shortcutManager) {
+    initializeIPC(shortcutManager);
+  }
 
   // 通知渲染进程主进程已就绪
   mainWindow.webContents.on('did-finish-load', () => {

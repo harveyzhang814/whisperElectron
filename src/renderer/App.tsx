@@ -17,15 +17,15 @@ const App: React.FC = () => {
   const { refreshTasks } = useTasks();
   const { setCurrentRecordingTask, currentTask, loadCurrentTask, getCurrentRecordingTaskId } = useRecordingTask();
 
-  useEffect(() => {
-    // Poll recording status every 500ms
-    const statusInterval = setInterval(async () => {
-      const status = await window.electron.getRecordingStatus();
-      setRecordingStatus(status);
-    }, 500);
+  // useEffect(() => {
+  //   Poll recording status every 500ms
+  //   const statusInterval = setInterval(async () => {
+  //     const status = await window.electron.getRecordingStatus();
+  //     setRecordingStatus(status);
+  //   }, 500);
 
-    return () => clearInterval(statusInterval);
-  }, []);
+  //   return () => clearInterval(statusInterval);
+  // }, []);
 
   const handleQuit = async () => {
     await window.electron.quitApp();
@@ -51,6 +51,10 @@ const App: React.FC = () => {
         await setCurrentRecordingTask(null);
         refreshTasks();
         console.error('Failed to start recording:', result.error);
+      } else {
+        // 更新录音状态
+        const status = await window.electron.getRecordingStatus();
+        setRecordingStatus(status);
       }
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -136,13 +140,13 @@ const App: React.FC = () => {
                 className="record-button"
                 onClick={handleStartRecording}
               >
-                Start Recording
+                Start
               </button>
               <button 
                 className="memo-button"
                 onClick={handleCreateMemoTask}
               >
-                Create Memo Task
+                Create
               </button>
             </>
           ) : (
@@ -151,13 +155,13 @@ const App: React.FC = () => {
                 className="stop-button"
                 onClick={handleStopRecording}
               >
-                Stop Recording
+                Stop
               </button>
               <button 
                 className="cancel-button"
                 onClick={handleCancelRecording}
               >
-                Cancel Recording
+                Cancel
               </button>
             </>
           )}
@@ -176,7 +180,7 @@ const App: React.FC = () => {
             Quit
           </button>
         </div>
-        <div className="status-indicator">{getStatusText()}</div>
+        {/* <div className="status-indicator">{getStatusText()}</div> */}
       </header>
 
       {/* Task List */}
@@ -190,9 +194,9 @@ const App: React.FC = () => {
       </main>
 
       {/* Status Bar */}
-      <footer className="status-bar">
+      {/* <footer className="status-bar">
         <div className="status-text">{getStatusText()}</div>
-      </footer>
+      </footer> */}
 
       {/* Shortcut Settings Modal */}
       {showShortcutSettings && (
