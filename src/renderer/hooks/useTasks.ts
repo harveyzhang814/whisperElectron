@@ -36,6 +36,12 @@ export const useTasks = () => {
     };
     listeners.add(listener);
 
+    // 添加 IPC 事件监听器
+    window.electron.onTaskRefresh(() => {
+      console.log('Refresh triggered by IPC event');
+      loadTasks();
+    });
+
     // 清理监听器
     return () => {
       listeners.delete(listener);

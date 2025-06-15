@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import * as record from 'node-record-lpcm16';
 import type { AudioConfig } from '../renderer/types/audio';
 
@@ -80,30 +80,15 @@ export class AudioRecorder {
         .pipe(this.fileStream);
 
       this.isRecording = true;
+
+      // 发送录音状态更新事件
+      BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: true });
+
       console.log('Recording started successfully');
 
       return { success: true, path: this.currentRecordingPath };
     } catch (error) {
       console.error('Error starting recording:', error);
-      // 确保在出错时重置状态
-      this.isRecording = false;
-      this.currentRecordingPath = null;
-      if (this.recInstance) {
-        try {
-          this.recInstance.stop();
-        } catch (e) {
-          console.error('Error stopping recording instance after error:', e);
-        }
-        this.recInstance = null;
-      }
-      if (this.fileStream) {
-        try {
-          this.fileStream.end();
-        } catch (e) {
-          console.error('Error closing file stream after error:', e);
-        }
-        this.fileStream = null;
-      }
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -142,6 +127,9 @@ export class AudioRecorder {
       const recordingPath = this.currentRecordingPath;
       this.currentRecordingPath = null;
 
+      // 发送录音状态更新事件
+      BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
+
       console.log('Recording stopped successfully');
       return { success: true, path: recordingPath };
     } catch (error) {
@@ -156,23 +144,51 @@ export class AudioRecorder {
   /**
    * Cancel the current recording and delete the temporary file
    */
-  async cancelRecording(): Promise<void> {
+  async cancelRecording(): Promise<RecordingResult> {
+    console.log('AudioRecorder.cancelRecording() called');
+    console.log('Current state:', { isRecording: this.isRecording, currentRecordingPath: this.currentRecordingPath });
+
     if (!this.isRecording) {
-      return;
+      console.log('No recording in progress');
+      return { success: false, error: 'No recording in progress' };
     }
-    if (this.recInstance) {
-      this.recInstance.stop();
-      this.recInstance = null;
+
+    try {
+      console.log('Stopping recording instance...');
+      if (this.recInstance) {
+        this.recInstance.stop();
+        this.recInstance = null;
+      }
+      if (this.fileStream) {
+        this.fileStream.end();
+        this.fileStream = null;
+      }
+
+      // 删除录音文件
+      if (this.currentRecordingPath) {
+        try {
+          fs.unlinkSync(this.currentRecordingPath);
+          console.log('Recording file deleted:', this.currentRecordingPath);
+        } catch (error) {
+          console.error('Error deleting recording file:', error);
+        }
+      }
+
+      this.isRecording = false;
+      this.currentRecordingPath = null;
+
+      // 发送录音状态更新事件
+      BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
+
+      console.log('Recording cancelled successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Error cancelling recording:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
-    if (this.fileStream) {
-      this.fileStream.end();
-      this.fileStream = null;
-    }
-    if (this.currentRecordingPath && fs.existsSync(this.currentRecordingPath)) {
-      fs.unlinkSync(this.currentRecordingPath);
-    }
-    this.isRecording = false;
-    this.currentRecordingPath = null;
   }
 
   /**

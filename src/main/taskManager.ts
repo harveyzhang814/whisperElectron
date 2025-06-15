@@ -79,7 +79,7 @@ export const TaskManager = {
       // 更新录音状态
       if (updates.status === 'recording') {
         currentRecordingTaskId = id;
-      } else if (updates.status === 'completed' && currentRecordingTaskId === id) {
+      } else if ((updates.status === 'completed' || updates.status === 'backlog') && currentRecordingTaskId === id) {
         currentRecordingTaskId = null;
       }
 

@@ -3,11 +3,16 @@ import { Task } from '../types/task';
 import { useTasks } from '../hooks/useTasks';
 import { useRecordingTask } from '../hooks/useRecordingTask';
 
+interface RecordingStatus {
+  isRecording: boolean;
+}
+
 export const TaskList: React.FC = () => {
   const { tasks, isLoading, error, refreshTasks } = useTasks();
   const { setCurrentRecordingTask, loadCurrentTask, getCurrentRecordingTaskId } = useRecordingTask();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({ isRecording: false });
 
   // 添加日志以追踪任务列表变化
   useEffect(() => {
@@ -20,27 +25,26 @@ export const TaskList: React.FC = () => {
       // 先开始录音
       const result = await window.electron.startRecording();
       console.log('Start recording result:', result);
-      if (result.success) {
-        // 如果录音成功，更新任务状态
-        console.log('Updating task status to recording');
+      if (!result.success) {
+        // 如果录音失败，将任务状态改回backlog
+        await window.electron.updateTask(task.id, { status: 'backlog' });
+        await setCurrentRecordingTask(null);
+        refreshTasks();
+        console.error('Failed to start recording:', result.error);
+      } else {
+        // 更新任务状态为录音中
         await window.electron.updateTask(task.id, { status: 'recording' });
         await setCurrentRecordingTask(task.id);
-        // 等待一小段时间让状态同步
-        await new Promise(resolve => setTimeout(resolve, 100));
-        console.log('Refreshing tasks after start recording');
         refreshTasks();
-      } else {
-        console.error('Failed to start recording:', result.error);
       }
     } catch (error) {
       console.error('Error starting recording:', error);
+      refreshTasks();
     }
   };
 
   const handleStopRecording = async (task: Task) => {
     try {
-      console.log('Stopping recording for task:', task);
-      // 先停止录音
       const result = await window.electron.stopRecording();
       console.log('Stop recording result:', result);
       
@@ -48,23 +52,40 @@ export const TaskList: React.FC = () => {
       await loadCurrentTask();
       const currentTaskId = getCurrentRecordingTaskId();
       
-      // 确保我们正在停止的是当前录音任务
-      if (result.success && currentTaskId === task.id) {
+      if (result.success && currentTaskId) {
         // 如果停止成功，更新任务状态
-        console.log('Updating task status to completed', task.id);
-        await window.electron.updateTask(task.id, { 
+        await window.electron.updateTask(currentTaskId, { 
           status: 'completed',
           audioPath: result.path
         });
         await setCurrentRecordingTask(null);
-        // 等待一小段时间让状态同步
-        await new Promise(resolve => setTimeout(resolve, 100));
         refreshTasks();
       } else {
-        console.error('Failed to stop recording or task mismatch:', result.error);
+        console.error('Failed to stop recording:', result.error);
       }
     } catch (error) {
       console.error('Error stopping recording:', error);
+    }
+  };
+
+  const handleCancelRecording = async (task: Task) => {
+    try {
+      const result = await window.electron.cancelRecording();
+      
+      // 重新获取最新的任务状态
+      await loadCurrentTask();
+      const currentTaskId = getCurrentRecordingTaskId();
+      
+      if (currentTaskId) {
+        await window.electron.updateTask(currentTaskId, { status: 'backlog' });
+        await setCurrentRecordingTask(null);
+      }
+      if (!result.success) {
+        console.error('Failed to cancel recording:', result.error);
+      }
+      refreshTasks();
+    } catch (error) {
+      console.error('Error canceling recording:', error);
     }
   };
 
@@ -197,12 +218,20 @@ export const TaskList: React.FC = () => {
               </button>
             )}
             {task.status === 'recording' && (
-              <button 
-                className="task-button stop"
-                onClick={() => handleStopRecording(task)}
-              >
-                End
-              </button>
+              <>
+                <button 
+                  className="task-button stop"
+                  onClick={() => handleStopRecording(task)}
+                >
+                  End
+                </button>
+                <button 
+                  className="task-button cancel"
+                  onClick={() => handleCancelRecording(task)}
+                >
+                  Cancel
+                </button>
+              </>
             )}
             {task.status === 'completed' && task.audioPath && (
               <button 

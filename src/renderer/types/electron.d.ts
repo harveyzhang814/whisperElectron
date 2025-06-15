@@ -23,6 +23,7 @@ interface ElectronAPI {
   getCurrentRecordingTask: () => Promise<Task | null>;
   onRecordingStatus: (callback: (status: { isRecording: boolean }) => void) => void;
   removeRecordingStatusListener: () => void;
+  sendRecordingStatus: (status: { isRecording: boolean }) => void;
 
   // App control methods
   quitApp: () => Promise<void>;

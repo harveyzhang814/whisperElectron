@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('electron', {
   removeRecordingStatusListener: () => {
     ipcRenderer.removeAllListeners('recording:status');
   },
+  sendRecordingStatus: (status: any) => {
+    ipcRenderer.send('recording:status', status);
+  },
 
   // App control
   quitApp: () => ipcRenderer.invoke('app:quit'),
