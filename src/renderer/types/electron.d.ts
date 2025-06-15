@@ -21,6 +21,8 @@ interface ElectronAPI {
   updateAudioConfig: (config: Partial<AudioConfig>) => Promise<{ success: boolean; error?: string }>;
   deleteAudioFile: (audioPath: string) => Promise<{ success: boolean; error?: string }>;
   getCurrentRecordingTask: () => Promise<Task | null>;
+  onRecordingStatus: (callback: (status: { isRecording: boolean }) => void) => void;
+  removeRecordingStatusListener: () => void;
 
   // App control methods
   quitApp: () => Promise<void>;
@@ -31,6 +33,9 @@ interface ElectronAPI {
   getAllTasks: () => Promise<Task[]>;
   deleteTask: (id: string) => Promise<{ success: boolean }>;
   openAudioFile: (audioPath: string) => Promise<{ success: boolean }>;
+
+  // Task refresh event
+  onTaskRefresh: (callback: () => void) => void;
 }
 
 interface Window {

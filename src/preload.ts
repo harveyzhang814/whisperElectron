@@ -17,6 +17,12 @@ contextBridge.exposeInMainWorld('electron', {
   updateAudioConfig: (config: any) => ipcRenderer.invoke('audio:updateConfig', config),
   deleteAudioFile: (audioPath: string) => ipcRenderer.invoke('audio:deleteFile', audioPath),
   getCurrentRecordingTask: () => ipcRenderer.invoke('task:getCurrentRecording'),
+  onRecordingStatus: (callback: (status: any) => void) => {
+    ipcRenderer.on('recording:status', (_event, status) => callback(status));
+  },
+  removeRecordingStatusListener: () => {
+    ipcRenderer.removeAllListeners('recording:status');
+  },
 
   // App control
   quitApp: () => ipcRenderer.invoke('app:quit'),
@@ -27,4 +33,7 @@ contextBridge.exposeInMainWorld('electron', {
   getAllTasks: () => ipcRenderer.invoke('task:getAll'),
   deleteTask: (id: string) => ipcRenderer.invoke('task:delete', id),
   openAudioFile: (audioPath: string) => ipcRenderer.invoke('task:openAudioFile', audioPath),
+
+  // Task refresh event
+  onTaskRefresh: (callback: () => void) => ipcRenderer.on('task:refresh', callback),
 }); 

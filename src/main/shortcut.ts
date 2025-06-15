@@ -1,4 +1,6 @@
-import { globalShortcut, Notification } from 'electron';
+import { globalShortcut, Notification, BrowserWindow } from 'electron';
+import { audioRecorder } from './audio';
+import { TaskManager } from './taskManager';
 
 // 快捷键动作类型
 export enum ShortcutAction {
@@ -39,7 +41,6 @@ const DEFAULT_SHORTCUTS: ShortcutConfig[] = [
 
 export class ShortcutManager {
   private shortcuts: Map<ShortcutAction, ShortcutConfig>;
-  private isRecording: boolean = false;
 
   constructor() {
     this.shortcuts = new Map();
@@ -79,27 +80,100 @@ export class ShortcutManager {
     console.log('已注销快捷键:', key);
   }
 
-  private handleShortcut(action: ShortcutAction) {
+  private async handleShortcut(action: ShortcutAction) {
+    if (!audioRecorder) {
+      console.error('Audio recorder not initialized');
+      return;
+    }
+
+    const status = audioRecorder.getStatus();
+    
     switch (action) {
+      // 快捷键触发开始录音
       case ShortcutAction.START_RECORDING:
-        if (!this.isRecording) {
-          this.isRecording = true;
-          new Notification({ title: '快捷键触发', body: '开始录音快捷键已触发！' }).show();
-          console.log('开始录音');
+        if (!status.isRecording) {
+          try {
+            // 创建新任务
+            const now = new Date().toISOString();
+            const title = `Recording-${now}`;
+            const task = await TaskManager.createTask(title, 'recording');
+            console.log('Created new task:', task);
+            
+            // 开始录音
+            const result = await audioRecorder.startRecording();
+            if (!result.success) {
+              // 如果录音失败，将任务状态改回 backlog
+              await TaskManager.updateTask(task.id, { status: 'backlog' });
+              console.error('Failed to start recording:', result.error);
+            }
+            // 发送刷新事件
+            BrowserWindow.getAllWindows()[0]?.webContents.send('task:refresh');
+            // 发送录音状态更新
+            BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: true });
+          } catch (error) {
+            console.error('Error in START_RECORDING:', error);
+          }
         }
         break;
+      
+      // 快捷键触发停止录音
       case ShortcutAction.STOP_RECORDING:
-        if (this.isRecording) {
-          this.isRecording = false;
-          new Notification({ title: '快捷键触发', body: '停止录音快捷键已触发！' }).show();
-          console.log('停止录音');
+        if (status.isRecording) {
+          try {
+            // 获取当前录音任务
+            const currentTask = await TaskManager.getCurrentRecordingTask();
+            if (!currentTask) {
+              console.error('未找到当前录音任务');
+              return;
+            }
+
+            // 停止录音
+            const result = await audioRecorder.stopRecording();
+            if (result.success) {
+              // 更新任务状态和音频路径
+              await TaskManager.updateTask(currentTask.id, {
+                status: 'completed',
+                audioPath: result.path
+              });
+              // 发送刷新事件
+              BrowserWindow.getAllWindows()[0]?.webContents.send('task:refresh');
+              // 发送录音状态更新
+              BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
+            } else {
+              console.error('Error in STOP_RECORDING:', result.error);
+            }
+          } catch (error) {
+            console.error('Error in STOP_RECORDING:', error);
+          }
         }
         break;
+
+      // 快捷键触发取消录音
       case ShortcutAction.CANCEL_RECORDING:
-        if (this.isRecording) {
-          this.isRecording = false;
-          new Notification({ title: '快捷键触发', body: '取消录音快捷键已触发！' }).show();
-          console.log('取消录音');
+        if (status.isRecording) {
+          try {
+            // 获取当前录音任务
+            const currentTask = await TaskManager.getCurrentRecordingTask();
+            if (!currentTask) {
+              console.error('未找到当前录音任务');
+              return;
+            }
+
+            // 取消录音
+            const result = await audioRecorder.cancelRecording();
+            if (result.success) {
+              // 更新任务状态
+              await TaskManager.updateTask(currentTask.id, { status: 'backlog' });
+              // 发送刷新事件
+              BrowserWindow.getAllWindows()[0]?.webContents.send('task:refresh');
+              // 发送录音状态更新
+              BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
+            } else {
+              console.error('Error in CANCEL_RECORDING:', result.error);
+            }
+          } catch (error) {
+            console.error('Error in CANCEL_RECORDING:', error);
+          }
         }
         break;
     }

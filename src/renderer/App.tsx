@@ -17,15 +17,17 @@ const App: React.FC = () => {
   const { refreshTasks } = useTasks();
   const { setCurrentRecordingTask, currentTask, loadCurrentTask, getCurrentRecordingTaskId } = useRecordingTask();
 
-  // useEffect(() => {
-  //   Poll recording status every 500ms
-  //   const statusInterval = setInterval(async () => {
-  //     const status = await window.electron.getRecordingStatus();
-  //     setRecordingStatus(status);
-  //   }, 500);
+  useEffect(() => {
+    // 监听录音状态更新事件
+    window.electron.onRecordingStatus((status: RecordingStatus) => {
+      setRecordingStatus(status);
+    });
 
-  //   return () => clearInterval(statusInterval);
-  // }, []);
+    return () => {
+      // 清理事件监听
+      window.electron.removeRecordingStatusListener();
+    };
+  }, []);
 
   const handleQuit = async () => {
     await window.electron.quitApp();
