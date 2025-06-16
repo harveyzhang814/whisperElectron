@@ -23,9 +23,21 @@ const App: React.FC = () => {
       setRecordingStatus(status);
     });
 
+    // 监听托盘菜单事件
+    window.electron.onRecordingStart(() => {
+      handleStartRecording();
+    });
+    window.electron.onRecordingStop(() => {
+      handleStopRecording();
+    });
+    window.electron.onRecordingCancel(() => {
+      handleCancelRecording();
+    });
+
     return () => {
       // 清理事件监听
       window.electron.removeRecordingStatusListener();
+      window.electron.removeTrayListeners();
     };
   }, []);
 
@@ -174,6 +186,12 @@ const App: React.FC = () => {
             onClick={() => setShowShortcutSettings(true)}
           >
             Settings
+          </button>
+          <button 
+            className="minimize-button"
+            onClick={() => window.electron.minimizeToTray()}
+          >
+            Minimize
           </button>
           <button 
             className="quit-button"

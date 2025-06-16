@@ -79,7 +79,8 @@
 }
 
 .settings-button,
-.quit-button {
+.quit-button,
+.minimize-button {
   padding: 0.5rem 1rem;
   background-color: var(--background-color);
   color: var(--text-primary);
@@ -90,7 +91,8 @@
 }
 
 .settings-button:hover,
-.quit-button:hover {
+.quit-button:hover,
+.minimize-button:hover {
   background-color: var(--toolbar-background);
   border-color: var(--text-secondary);
 }
@@ -103,6 +105,16 @@
   background-color: #ef4444;
   color: white;
   border-color: #ef4444;
+}
+
+.minimize-button {
+  color: #3b82f6;
+}
+
+.minimize-button:hover {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
 }
 
 .status-indicator {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import path from 'path';
 import { ShortcutManager } from './shortcut';
 import { initializeAudioRecorder, setupAudioIPC, audioRecorder } from './audio';
@@ -7,6 +7,124 @@ import { initializeIPC } from './ipc';
 
 let shortcutManager: ShortcutManager | null = null;
 let isQuitting = false;
+let tray: Tray | null = null;
+
+function createTray(mainWindow: BrowserWindow) {
+  // 创建托盘图标
+  let iconPath: string;
+  if (process.env.NODE_ENV === 'development') {
+    // 在开发环境中，使用项目根目录
+    iconPath = path.join(process.cwd(), 'src/assets/tray-icon.png');
+  } else {
+    // 在生产环境中，使用相对于编译后文件的路径
+    iconPath = path.join(__dirname, '../assets/tray-icon.png');
+  }
+  
+  console.log('Current working directory:', process.cwd());
+  console.log('Tray icon path:', iconPath);
+
+  try {
+    const icon = nativeImage.createFromPath(iconPath);
+    if (icon.isEmpty()) {
+      console.error('Failed to load tray icon from path:', iconPath);
+      return null;
+    }
+
+    // 强制调整图标尺寸为 20x20
+    const resizedIcon = icon.resize({
+      width: 20,
+      height: 20,
+      quality: 'best'
+    });
+
+    // 创建托盘实例
+    tray = new Tray(resizedIcon);
+    
+    // 设置托盘图标的模板模式（macOS 特性）
+    if (process.platform === 'darwin') {
+      resizedIcon.setTemplateImage(true);
+    }
+    
+    tray.setToolTip('WhisperElectron');
+
+    // 更新菜单的函数
+    const updateMenu = async () => {
+      const isRecording = audioRecorder?.getStatus().isRecording || false;
+      
+      const contextMenu = Menu.buildFromTemplate([
+        {
+          label: 'Window',
+          click: () => {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        },
+        { type: 'separator' },
+        ...(isRecording ? [
+          {
+            label: 'Stop',
+            click: () => {
+              mainWindow.webContents.send('recording:stop');
+            }
+          },
+          {
+            label: 'Cancel',
+            click: () => {
+              mainWindow.webContents.send('recording:cancel');
+            }
+          }
+        ] : [
+          {
+            label: 'Start',
+            click: () => {
+              mainWindow.webContents.send('recording:start');
+            }
+          }
+        ]),
+        { type: 'separator' },
+        {
+          label: 'Settings',
+          click: () => {
+            mainWindow.show();
+            mainWindow.focus();
+            mainWindow.webContents.send('app:openSettings');
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit',
+          click: () => {
+            quitApp();
+          }
+        }
+      ]);
+
+      tray?.setContextMenu(contextMenu);
+    };
+
+    // 初始创建菜单
+    updateMenu();
+
+    // 监听录音状态变化
+    mainWindow.webContents.on('did-finish-load', () => {
+      // 监听录音状态更新
+      ipcMain.on('recording:status', () => {
+        updateMenu();
+      });
+    });
+
+    // 点击托盘图标显示主窗口
+    tray.on('click', () => {
+      mainWindow.show();
+      mainWindow.focus();
+    });
+
+    return tray;
+  } catch (error) {
+    console.error('Error creating tray:', error);
+    return null;
+  }
+}
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -42,6 +160,9 @@ function createWindow() {
     }
   });
 
+  // 创建托盘图标
+  createTray(mainWindow);
+
   return mainWindow;
 }
 
@@ -66,6 +187,12 @@ export async function quitApp() {
   if (shortcutManager) {
     shortcutManager.cleanup();
     shortcutManager = null;
+  }
+
+  // 清理托盘
+  if (tray) {
+    tray.destroy();
+    tray = null;
   }
 
   // 关闭所有窗口
@@ -93,6 +220,11 @@ app.whenReady().then(async () => {
   if (shortcutManager) {
     initializeIPC(shortcutManager);
   }
+
+  // 添加 IPC 处理程序
+  ipcMain.handle('app:minimizeToTray', () => {
+    mainWindow?.hide();
+  });
 
   // 通知渲染进程主进程已就绪
   mainWindow.webContents.on('did-finish-load', () => {

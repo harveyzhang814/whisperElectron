@@ -25,6 +25,13 @@ interface ElectronAPI {
   removeRecordingStatusListener: () => void;
   sendRecordingStatus: (status: { isRecording: boolean }) => void;
 
+  // Tray related methods
+  onRecordingStart: (callback: () => void) => void;
+  onRecordingStop: (callback: () => void) => void;
+  onRecordingCancel: (callback: () => void) => void;
+  removeTrayListeners: () => void;
+  minimizeToTray: () => Promise<void>;
+
   // App control methods
   quitApp: () => Promise<void>;
 

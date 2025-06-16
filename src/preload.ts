@@ -27,6 +27,23 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.send('recording:status', status);
   },
 
+  // Tray related
+  onRecordingStart: (callback: () => void) => {
+    ipcRenderer.on('recording:start', callback);
+  },
+  onRecordingStop: (callback: () => void) => {
+    ipcRenderer.on('recording:stop', callback);
+  },
+  onRecordingCancel: (callback: () => void) => {
+    ipcRenderer.on('recording:cancel', callback);
+  },
+  removeTrayListeners: () => {
+    ipcRenderer.removeAllListeners('recording:start');
+    ipcRenderer.removeAllListeners('recording:stop');
+    ipcRenderer.removeAllListeners('recording:cancel');
+  },
+  minimizeToTray: () => ipcRenderer.invoke('app:minimizeToTray'),
+
   // App control
   quitApp: () => ipcRenderer.invoke('app:quit'),
 
