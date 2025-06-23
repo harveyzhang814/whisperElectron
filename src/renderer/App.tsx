@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShortcutSettings } from './components/ShortcutSettings';
+import { ApiSettings } from './components/ApiSettings';
 import { TaskList } from './components/TaskList';
 import { useTasks } from './hooks/useTasks';
 import { useRecordingTask } from './hooks/useRecordingTask';
@@ -9,8 +10,10 @@ interface RecordingStatus {
   isRecording: boolean;
 }
 
+type SettingsType = 'shortcuts' | 'api' | null;
+
 const App: React.FC = () => {
-  const [showShortcutSettings, setShowShortcutSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState<SettingsType>(null);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({
     isRecording: false,
   });
@@ -181,12 +184,20 @@ const App: React.FC = () => {
           )}
         </div>
         <div className="toolbar-right">
-          <button 
-            className="settings-button"
-            onClick={() => setShowShortcutSettings(true)}
-          >
-            Settings
-          </button>
+          <div className="settings-buttons">
+            <button 
+              className={`settings-button ${showSettings === 'shortcuts' ? 'active' : ''}`}
+              onClick={() => setShowSettings(showSettings === 'shortcuts' ? null : 'shortcuts')}
+            >
+              Shortcuts
+            </button>
+            <button 
+              className={`settings-button ${showSettings === 'api' ? 'active' : ''}`}
+              onClick={() => setShowSettings(showSettings === 'api' ? null : 'api')}
+            >
+              API
+            </button>
+          </div>
           <button 
             className="minimize-button"
             onClick={() => window.electron.minimizeToTray()}
@@ -218,9 +229,12 @@ const App: React.FC = () => {
         <div className="status-text">{getStatusText()}</div>
       </footer> */}
 
-      {/* Shortcut Settings Modal */}
-      {showShortcutSettings && (
-        <ShortcutSettings onClose={() => setShowShortcutSettings(false)} />
+      {/* Settings Modals */}
+      {showSettings === 'shortcuts' && (
+        <ShortcutSettings onClose={() => setShowSettings(null)} />
+      )}
+      {showSettings === 'api' && (
+        <ApiSettings onClose={() => setShowSettings(null)} />
       )}
     </div>
   );

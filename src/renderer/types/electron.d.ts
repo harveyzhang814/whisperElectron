@@ -44,6 +44,11 @@ interface ElectronAPI {
 
   // Task refresh event
   onTaskRefresh: (callback: () => void) => void;
+
+  // Whisper 配置相关方法
+  getWhisperConfig: () => Promise<any>;
+  updateWhisperConfig: (config: any) => Promise<any>;
+  testWhisperConnection: () => Promise<any>;
 }
 
 interface Window {

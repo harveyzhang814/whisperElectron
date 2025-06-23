@@ -56,4 +56,9 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Task refresh event
   onTaskRefresh: (callback: () => void) => ipcRenderer.on('task:refresh', callback),
+
+  // Whisper 配置相关
+  getWhisperConfig: () => ipcRenderer.invoke('config:getWhisper'),
+  updateWhisperConfig: (config: any) => ipcRenderer.invoke('config:updateWhisper', config),
+  testWhisperConnection: () => ipcRenderer.invoke('config:testWhisperConnection'),
 }); 

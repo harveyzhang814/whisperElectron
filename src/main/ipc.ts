@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { ShortcutManager } from './shortcut';
 import { TaskManager } from './taskManager';
 import { quitApp } from './index';
+import { configManager } from './config';
 
 // 初始化所有 IPC 处理器
 export function initializeIPC(shortcutManager: ShortcutManager) {
@@ -45,5 +46,24 @@ export function initializeIPC(shortcutManager: ShortcutManager) {
 
   ipcMain.handle('task:getCurrentRecording', async () => {
     return await TaskManager.getCurrentRecordingTask();
+  });
+
+  // Whisper 配置相关的 IPC
+  ipcMain.handle('config:getWhisper', async () => {
+    await configManager.initialize();
+    return configManager.getConfigSection('whisper');
+  });
+
+  ipcMain.handle('config:updateWhisper', async (_event, whisperConfig) => {
+    await configManager.initialize();
+    return await configManager.updateConfigSection('whisper', whisperConfig);
+  });
+
+  ipcMain.handle('config:testWhisperConnection', async () => {
+    await configManager.initialize();
+    const whisper = configManager.getConfigSection('whisper');
+    // 这里可以实现实际的 API 测试逻辑，暂时返回 success: true
+    // TODO: 可用 fetch/axios 请求 whisper.baseUrl/health
+    return { success: true, models: [whisper.defaultModel] };
   });
 } 
