@@ -388,148 +388,222 @@
 
 ---
 
-# IPC 集成开发计划
+# Whisper Docker API Integration Development Plan
 
-## 功能描述
-将 Whisper API 客户端功能通过 IPC 暴露给渲染进程，实现：
-- 转写任务的创建、管理和监控
-- 模型列表获取和健康检查
-- 实时进度更新和状态同步
-- 错误处理和用户友好的消息
+## Current Branch: fea/transcribe-by-whisper
 
-## 实现步骤
+### Phase 1: Complete API Integration
+- [ ] Update remaining components to use new job-related terminology
+  - [ ] Review and update `src/main/whisper/manager.ts`
+  - [ ] Review and update `src/main/whisper/client.ts`
+  - [ ] Review and update `src/main/ipc.ts`
+  - [ ] Review and update type definitions in `src/main/whisper/types.ts`
 
-### 第一阶段：基础 IPC 接口扩展
+- [ ] Implement API Configuration Management
+  - [ ] Create API configuration UI in `ApiSettings.tsx`
+  - [ ] Add configuration validation
+  - [ ] Implement configuration persistence
+  - [ ] Add configuration health check functionality
 
-#### 1. 扩展主进程 IPC 处理器
-- [ ] 修改 src/main/ipc.ts
-  - [ ] 添加 Whisper 客户端实例管理
-  - [ ] 添加转写相关 IPC 方法
-    - [ ] whisper:transcribe - 开始转写任务
-    - [ ] whisper:cancel - 取消转写任务
-    - [ ] whisper:getTask - 获取任务状态
-    - [ ] whisper:getAllTasks - 获取所有任务
-  - [ ] 添加模型和健康检查方法
-    - [ ] whisper:getModels - 获取可用模型
-    - [ ] whisper:checkHealth - 健康检查
-    - [ ] whisper:testConnection - 连接测试
-  - [ ] 添加事件监听器管理
-    - [ ] whisper:onProgress - 进度更新事件
-    - [ ] whisper:onComplete - 完成事件
-    - [ ] whisper:onError - 错误事件
+### Phase 2: Enhanced Error Handling & User Feedback
+- [ ] Implement comprehensive error handling
+  - [ ] Add specific error types for API-related errors
+  - [ ] Implement user-friendly error messages
+  - [ ] Add error recovery mechanisms
 
-#### 2. 扩展预加载脚本
-- [ ] 修改 src/preload.ts
-  - [ ] 添加 Whisper 相关方法暴露
-  - [ ] 添加事件监听器方法
-  - [ ] 添加类型安全的接口
+- [ ] Improve User Feedback
+  - [ ] Add loading states for API operations
+  - [ ] Implement progress indicators for transcription jobs
+  - [ ] Add notification system for job status updates
 
-#### 3. 更新类型定义
-- [ ] 修改 src/renderer/types/electron.d.ts
-  - [ ] 添加 Whisper 相关接口定义
-  - [ ] 添加转写任务类型
-  - [ ] 添加进度更新类型
-  - [ ] 添加事件回调类型
+### Phase 3: Testing & Documentation
+- [ ] Write Tests
+  - [ ] Unit tests for API client
+  - [ ] Integration tests for API communication
+  - [ ] End-to-end tests for transcription workflow
 
-### 第二阶段：客户端集成
+- [ ] Update Documentation
+  - [ ] Update API integration documentation
+  - [ ] Document configuration options
+  - [ ] Add troubleshooting guide
+  - [ ] Update CHANGELOG.md
 
-#### 4. 集成 Whisper 客户端
-- [ ] 修改 src/main/ipc.ts
-  - [ ] 导入 WhisperAPIClient
-  - [ ] 创建客户端实例
-  - [ ] 集成配置管理
-  - [ ] 实现事件转发
+### Phase 4: Performance & Optimization
+- [ ] Implement Job Queue Management
+  - [ ] Add job prioritization
+  - [ ] Implement job cancellation
+  - [ ] Add retry mechanism for failed jobs
 
-#### 5. 实现任务管理
-- [ ] 实现任务生命周期管理
-  - [ ] 任务创建和初始化
-  - [ ] 任务状态跟踪
-  - [ ] 任务清理和资源释放
-- [ ] 实现进度更新机制
-  - [ ] 实时进度推送
-  - [ ] 状态同步
-  - [ ] 错误处理
+- [ ] Optimize Resource Usage
+  - [ ] Implement proper cleanup of completed jobs
+  - [ ] Add memory usage monitoring
+  - [ ] Optimize API request handling
 
-### 第三阶段：错误处理和优化
+### Phase 5: Final Review & Release Preparation
+- [ ] Code Review
+  - [ ] Review all changes for consistency
+  - [ ] Check for potential memory leaks
+  - [ ] Ensure proper error handling throughout
 
-#### 6. 完善错误处理
-- [ ] 实现用户友好的错误消息
-- [ ] 添加重试机制
-- [ ] 实现错误恢复
-- [ ] 添加日志记录
+- [ ] Release Preparation
+  - [ ] Update version numbers
+  - [ ] Finalize CHANGELOG.md
+  - [ ] Prepare release notes
+  - [ ] Create release branch 
 
-#### 7. 性能优化
-- [ ] 实现任务队列管理
-- [ ] 添加资源限制
-- [ ] 优化内存使用
-- [ ] 实现并发控制
+# Whisper Integration Development Plan
 
-### 第四阶段：测试和验证
+## Current Focus: Task & Job Lifecycle Management
 
-#### 8. 创建测试脚本
-- [ ] 创建 tests/ipc-whisper.test.ts
-  - [ ] 测试基础 IPC 方法
-  - [ ] 测试事件监听
-  - [ ] 测试错误处理
-  - [ ] 测试并发操作
+### Phase 1: Core Types and Interfaces
+- [ ] Create/Update Type Definitions
+  - [ ] In `src/main/types/`
+    - [ ] Define `RecordingTaskStatus` enum
+    - [ ] Define `TranscriptionJobStatus` enum
+    - [ ] Create `TaskStatus` interface
+    - [ ] Create `JobStatus` interface
+    - [ ] Define event types for status changes
+  - [ ] In `src/renderer/types/`
+    - [ ] Update `electron.d.ts` with new IPC methods
+    - [ ] Add type definitions for UI components
 
-#### 9. 集成测试
-- [ ] 测试与现有功能的兼容性
-- [ ] 测试配置管理集成
-- [ ] 测试任务管理集成
-- [ ] 测试 UI 组件集成
+### Phase 2: Main Process Implementation
+- [ ] Enhance TaskManager (`src/main/taskManager.ts`)
+  - [ ] Add TranscriptionJob management
+    - [ ] Create TranscriptionJob class
+    - [ ] Implement job status tracking
+    - [ ] Add job progress monitoring
+  - [ ] Update TaskManager class
+    - [ ] Add job management methods
+    - [ ] Implement task-to-job transition
+    - [ ] Add status query methods
+    - [ ] Implement event emission system
 
-## 可能的影响
+- [ ] Update Whisper Integration (`src/main/whisper/`)
+  - [ ] Update client.ts
+    - [ ] Refactor API calls to use job terminology
+    - [ ] Add progress tracking
+    - [ ] Enhance error handling
+  - [ ] Update manager.ts
+    - [ ] Implement job queue management
+    - [ ] Add job lifecycle hooks
+    - [ ] Implement status synchronization
 
-### 功能影响
-- 新增 Whisper 转写功能
-- 扩展任务管理系统
-- 增强配置管理功能
+- [ ] Enhance IPC Layer (`src/main/ipc.ts`)
+  - [ ] Add new IPC handlers
+    - [ ] Task status queries
+    - [ ] Job status queries
+    - [ ] Combined status queries
+  - [ ] Implement event forwarding
+    - [ ] Task status changes
+    - [ ] Job status changes
+    - [ ] Progress updates
 
-### 性能影响
-- 增加 IPC 通信开销
-- 需要管理客户端实例
-- 需要处理事件监听器
+### Phase 3: Renderer Process Implementation
+- [ ] Create/Update React Hooks
+  - [ ] Enhance `useRecordingTask.ts`
+    - [ ] Add job status tracking
+    - [ ] Implement progress monitoring
+    - [ ] Add error handling
+  - [ ] Create `useTranscriptionJob.ts`
+    - [ ] Implement job status tracking
+    - [ ] Add progress monitoring
+    - [ ] Handle error states
 
-### 用户体验影响
-- 提供实时转写进度
-- 支持任务取消和重试
-- 提供详细的错误信息
+- [ ] Update UI Components
+  - [ ] Enhance TaskList.tsx
+    - [ ] Add job status display
+    - [ ] Show progress indicators
+    - [ ] Improve error handling
+  - [ ] Update WhisperTest.tsx
+    - [ ] Refactor to use new job terminology
+    - [ ] Add job status testing
+    - [ ] Enhance error display
 
-## 测试计划
+### Phase 4: Testing
+- [ ] Unit Tests
+  - [ ] Test TaskManager
+    - [ ] Test task-to-job transition
+    - [ ] Test status management
+    - [ ] Test event emission
+  - [ ] Test TranscriptionJob
+    - [ ] Test status transitions
+    - [ ] Test progress tracking
+    - [ ] Test error handling
 
-### 1. 基础功能测试
-- [ ] 测试转写任务创建
-- [ ] 测试模型列表获取
-- [ ] 测试健康检查
-- [ ] 测试连接测试
+- [ ] Integration Tests
+  - [ ] Test full recording-to-transcription flow
+  - [ ] Test error recovery scenarios
+  - [ ] Test concurrent operations
+  - [ ] Test IPC communication
 
-### 2. 事件监听测试
-- [ ] 测试进度更新事件
-- [ ] 测试完成事件
-- [ ] 测试错误事件
-- [ ] 测试事件清理
+### Phase 5: Documentation & Polish
+- [ ] Update Documentation
+  - [ ] Document new types and interfaces
+  - [ ] Add flow diagrams
+  - [ ] Update API documentation
+  - [ ] Add usage examples
 
-### 3. 错误处理测试
-- [ ] 测试网络错误
-- [ ] 测试文件错误
-- [ ] 测试配置错误
-- [ ] 测试超时错误
+- [ ] Code Quality
+  - [ ] Add comprehensive error logging
+  - [ ] Implement proper cleanup
+  - [ ] Add performance monitoring
+  - [ ] Review error handling
 
-### 4. 并发测试
-- [ ] 测试多任务并发
-- [ ] 测试任务取消
-- [ ] 测试资源清理
-- [ ] 测试内存泄漏
+## Implementation Order
 
-## 注意事项
-1. 确保 IPC 通信的安全性
-2. 正确处理事件监听器的清理
-3. 实现适当的错误恢复机制
-4. 优化性能和内存使用
+1. Start with Phase 1 - Core Types
+   - This provides the foundation for all other changes
+   - Ensures type safety throughout the implementation
 
-## 下一步计划
-1. 开始第一阶段的基础 IPC 接口扩展
-2. 实现 Whisper 客户端集成
-3. 完善错误处理和优化
-4. 进行全面的测试和验证 
+2. Move to Phase 2 - Main Process
+   - Begin with TaskManager enhancements
+   - Then update Whisper integration
+   - Finally implement IPC changes
+
+3. Proceed to Phase 3 - Renderer Process
+   - Start with hooks implementation
+   - Then update UI components
+
+4. Complete Phase 4 - Testing
+   - Write tests as features are implemented
+   - Focus on critical paths first
+
+5. Finish with Phase 5 - Documentation
+   - Document as we go
+   - Final polish and review
+
+## Key Files to Modify
+
+```
+src/
+├── main/
+│   ├── taskManager.ts
+│   ├── ipc.ts
+│   ├── types/
+│   │   ├── task.ts
+│   │   └── job.ts
+│   └── whisper/
+│       ├── client.ts
+│       └── manager.ts
+├── renderer/
+│   ├── hooks/
+│   │   ├── useRecordingTask.ts
+│   │   └── useTranscriptionJob.ts
+│   ├── components/
+│   │   ├── TaskList.tsx
+│   │   └── WhisperTest.tsx
+│   └── types/
+│       └── electron.d.ts
+└── tests/
+    ├── taskManager.test.ts
+    └── whisper-integration.test.ts
+```
+
+## Success Criteria
+- [ ] Recording tasks smoothly transition to transcription jobs
+- [ ] Real-time status updates are properly propagated
+- [ ] Error handling is comprehensive and user-friendly
+- [ ] Progress reporting is accurate and responsive
+- [ ] Resource cleanup is properly handled
+- [ ] Type safety is maintained throughout the system 

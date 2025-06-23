@@ -67,6 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved code consistency by aligning with project's singleton pattern
 - Reduced boilerplate in IPC handlers by using direct whisperManager import
 
+- **Whisper API Client**: Renamed task-related concepts to job-related concepts
+  - Renamed `TranscribeTask` to `TranscriptionJob`
+  - Updated all related method names and variables
+  - Better distinction between recording tasks and transcription jobs
+  - Improved code clarity and reduced concept overlap
+
 ### Technical Details
 - **Dependencies Added**:
   - `

@@ -5,7 +5,13 @@
 
 import { EventEmitter } from 'events';
 import { WhisperAPIClient } from './client';
-import { WhisperTranscribeRequest, TranscribeTask, WhisperModel, WhisperHealthResponse } from './types';
+import { 
+  WhisperTranscribeRequest, 
+  TranscriptionJob, 
+  WhisperModel, 
+  WhisperHealthResponse,
+  WhisperAPIClientConfig
+} from './types';
 import { configManager } from '../config';
 
 class WhisperManager extends EventEmitter {
@@ -26,25 +32,29 @@ class WhisperManager extends EventEmitter {
       baseUrl: config.baseUrl,
       defaultModel: config.defaultModel,
       timeout: config.timeout || 30000,
-      retryAttempts: config.retries || 3
+      retryAttempts: config.retryAttempts || 3
     });
 
     // Forward all client events
-    this.client.on('transcribe:start', (taskId: string, filePath: string) => {
-      this.emit('transcribe:start', taskId, filePath);
+    this.client.on('transcribe:start', (jobId: string, filePath: string) => {
+      this.emit('transcribe:start', jobId, filePath);
     });
     
-    this.client.on('transcribe:progress', (taskId: string, progress: any) => {
-      this.emit('transcribe:progress', taskId, progress);
+    this.client.on('transcribe:progress', (jobId: string, progress: any) => {
+      this.emit('transcribe:progress', jobId, progress);
     });
     
-    this.client.on('transcribe:complete', (taskId: string, result: any) => {
-      this.emit('transcribe:complete', taskId, result);
+    this.client.on('transcribe:complete', (jobId: string, result: any) => {
+      this.emit('transcribe:complete', jobId, result);
     });
     
-    this.client.on('transcribe:error', (taskId: string, error: string) => {
-      this.emit('transcribe:error', taskId, error);
+    this.client.on('transcribe:error', (jobId: string, error: string) => {
+      this.emit('transcribe:error', jobId, error);
     });
+  }
+
+  public reinitializeClient() {
+    this.initializeClient();
   }
 
   public async transcribe(filePath: string, options: Partial<WhisperTranscribeRequest> = {}, onProgress?: (progress: any) => void): Promise<any> {
@@ -54,55 +64,48 @@ class WhisperManager extends EventEmitter {
     return this.client.transcribe(filePath, options, onProgress);
   }
 
-  public cancelTranscribe(taskId: string): boolean {
+  public cancelTranscribe(jobId: string): boolean {
     if (!this.client) {
       throw new Error('Whisper client not initialized');
     }
-    return this.client.cancelTranscribe(taskId);
+    return this.client.cancelTranscribe(jobId);
   }
 
-  public getTask(taskId: string): TranscribeTask | null {
+  public getTranscriptionJob(jobId: string): TranscriptionJob | null {
     if (!this.client) {
       throw new Error('Whisper client not initialized');
     }
-    const task = this.client.getTask(taskId);
-    return task || null;
+    const job = this.client.getTranscriptionJob(jobId);
+    return job || null;
   }
 
-  public getAllTasks(): TranscribeTask[] {
+  public getAllTranscriptionJobs(): TranscriptionJob[] {
     if (!this.client) {
       throw new Error('Whisper client not initialized');
     }
-    return this.client.getAllTasks();
+    return this.client.getAllTranscriptionJobs();
   }
 
-  public async getModels(): Promise<{ name: string }[]> {
+  public async getModels(): Promise<WhisperModel[]> {
     if (!this.client) {
       throw new Error('Whisper client not initialized');
     }
     return this.client.getModels();
   }
 
-  public async checkHealth(): Promise<any> {
+  public async checkHealth(): Promise<WhisperHealthResponse> {
     if (!this.client) {
       throw new Error('Whisper client not initialized');
     }
     return this.client.checkHealth();
   }
 
-  public async testConnection(): Promise<boolean> {
-    if (!this.client) {
-      throw new Error('Whisper client not initialized');
-    }
-    return this.client.testConnection();
-  }
-
-  public async testNewConnection(config: any): Promise<{ success: boolean; health?: any; models?: string[]; error?: string }> {
+  public async testNewConnection(config: WhisperAPIClientConfig): Promise<{ success: boolean; health?: any; models?: string[]; error?: string }> {
     const tempClient = new WhisperAPIClient({
       baseUrl: config.baseUrl,
       defaultModel: config.defaultModel,
       timeout: config.timeout || 30000,
-      retryAttempts: config.retries || 3
+      retryAttempts: config.retryAttempts || 3
     });
     
     try {
@@ -122,11 +125,7 @@ class WhisperManager extends EventEmitter {
       };
     }
   }
-
-  public reinitializeClient() {
-    this.initializeClient();
-  }
 }
 
-// Export singleton instance
+// Export a singleton instance
 export const whisperManager = new WhisperManager();

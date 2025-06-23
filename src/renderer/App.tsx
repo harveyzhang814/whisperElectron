@@ -198,12 +198,12 @@ const App: React.FC = () => {
             >
               API
             </button>
-            <button 
+          <button 
               className={`settings-button ${showSettings === 'test' ? 'active' : ''}`}
               onClick={() => setShowSettings(showSettings === 'test' ? null : 'test')}
-            >
+          >
               Test
-            </button>
+          </button>
           </div>
           <button 
             className="minimize-button"

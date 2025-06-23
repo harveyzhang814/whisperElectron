@@ -63,9 +63,9 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Whisper 转写相关
   whisperTranscribe: (filePath: string, options?: any) => ipcRenderer.invoke('whisper:transcribe', filePath, options),
-  whisperCancel: (taskId: string) => ipcRenderer.invoke('whisper:cancel', taskId),
-  whisperGetTask: (taskId: string) => ipcRenderer.invoke('whisper:getTask', taskId),
-  whisperGetAllTasks: () => ipcRenderer.invoke('whisper:getAllTasks'),
+  whisperCancel: (jobId: string) => ipcRenderer.invoke('whisper:cancel', jobId),
+  whisperGetJob: (jobId: string) => ipcRenderer.invoke('whisper:getJob', jobId),
+  whisperGetAllJobs: () => ipcRenderer.invoke('whisper:getAllJobs'),
   whisperGetModels: () => ipcRenderer.invoke('whisper:getModels'),
   whisperCheckHealth: () => ipcRenderer.invoke('whisper:checkHealth'),
   whisperTestConnection: () => ipcRenderer.invoke('whisper:testConnection'),

@@ -76,7 +76,7 @@ interface TranscribeTask {
   completedAt?: Date;
 }
 
-interface ElectronAPI {
+export interface ElectronAPI {
   // App lifecycle
   onReady: (callback: () => void) => void;
   
@@ -121,18 +121,18 @@ interface ElectronAPI {
   updateWhisperConfig: (config: any) => Promise<any>;
 
   // Whisper 转写相关方法
-  whisperTranscribe: (filePath: string, options?: Partial<WhisperTranscribeRequest>) => Promise<{ success: boolean; result?: WhisperTranscribeResponse; error?: string }>;
-  whisperCancel: (taskId: string) => Promise<{ success: boolean; error?: string }>;
-  whisperGetTask: (taskId: string) => Promise<{ success: boolean; task?: TranscribeTask; error?: string }>;
-  whisperGetAllTasks: () => Promise<{ success: boolean; tasks?: TranscribeTask[]; error?: string }>;
-  whisperGetModels: () => Promise<{ success: boolean; models?: WhisperModel[]; error?: string }>;
-  whisperCheckHealth: () => Promise<{ success: boolean; health?: WhisperHealthResponse; error?: string }>;
-  whisperTestConnection: () => Promise<{ success: boolean; error?: string }>;
+  whisperTranscribe: (filePath: string, options?: any) => Promise<any>;
+  whisperCancel: (jobId: string) => Promise<any>;
+  whisperGetJob: (jobId: string) => Promise<any>;
+  whisperGetAllJobs: () => Promise<any>;
+  whisperGetModels: () => Promise<any>;
+  whisperCheckHealth: () => Promise<any>;
+  whisperTestConnection: () => Promise<any>;
 
   // Whisper 事件监听方法
-  onWhisperProgress: (callback: (progress: TranscribeProgress) => void) => void;
-  onWhisperComplete: (callback: (result: WhisperTranscribeResponse) => void) => void;
-  onWhisperError: (callback: (error: string) => void) => void;
+  onWhisperProgress: (callback: (progress: any) => void) => void;
+  onWhisperComplete: (callback: (result: any) => void) => void;
+  onWhisperError: (callback: (error: any) => void) => void;
   removeWhisperListeners: () => void;
 }
 

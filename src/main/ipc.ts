@@ -78,9 +78,9 @@ export function initializeIPC(shortcutManager: ShortcutManager) {
     }
   });
 
-  ipcMain.handle('whisper:cancel', async (_, taskId: string) => {
+  ipcMain.handle('whisper:cancel', async (_, jobId: string) => {
     try {
-      const cancelled = whisperManager.cancelTranscribe(taskId);
+      const cancelled = whisperManager.cancelTranscribe(jobId);
       return { success: cancelled };
     } catch (error) {
       return { 
@@ -90,10 +90,10 @@ export function initializeIPC(shortcutManager: ShortcutManager) {
     }
   });
 
-  ipcMain.handle('whisper:getTask', async (_, taskId: string) => {
+  ipcMain.handle('whisper:getJob', async (_, jobId: string) => {
     try {
-      const task = whisperManager.getTask(taskId);
-      return { success: true, task };
+      const job = whisperManager.getTranscriptionJob(jobId);
+      return { success: true, job };
     } catch (error) {
       return { 
         success: false, 
@@ -102,10 +102,10 @@ export function initializeIPC(shortcutManager: ShortcutManager) {
     }
   });
 
-  ipcMain.handle('whisper:getAllTasks', async () => {
+  ipcMain.handle('whisper:getAllJobs', async () => {
     try {
-      const tasks = whisperManager.getAllTasks();
-      return { success: true, tasks };
+      const jobs = whisperManager.getAllTranscriptionJobs();
+      return { success: true, jobs };
     } catch (error) {
       return { 
         success: false, 
@@ -140,8 +140,17 @@ export function initializeIPC(shortcutManager: ShortcutManager) {
 
   ipcMain.handle('whisper:testConnection', async () => {
     try {
-      const connected = await whisperManager.testConnection();
-      return { success: connected };
+      const baseConfig = configManager.getConfigSection('whisper');
+      const config = {
+        ...baseConfig,
+        retryDelay: 1000,
+        defaultLanguage: baseConfig.language || 'auto',
+        defaultOutputFormat: 'json' as const,
+        enableWordTimestamps: false,
+        enableConfidence: false
+      };
+      const result = await whisperManager.testNewConnection(config);
+      return result;
     } catch (error) {
       return { 
         success: false, 

@@ -12,7 +12,7 @@ import {
   WhisperModel,
   WhisperHealthResponse,
   TranscribeProgress,
-  TranscribeTask,
+  TranscriptionJob,
   WhisperAPIClientConfig,
   WhisperAPIEvents
 } from './types';
@@ -36,7 +36,7 @@ const path = require('path');
  */
 export class WhisperAPIClient extends EventEmitter {
   private config: WhisperAPIClientConfig;
-  private tasks: Map<string, TranscribeTask> = new Map();
+  private jobs: Map<string, TranscriptionJob> = new Map();
   private abortControllers: Map<string, AbortController> = new Map();
   private healthCheckInterval?: NodeJS.Timeout;
   private modelsCache?: WhisperModel[];
@@ -91,15 +91,15 @@ export class WhisperAPIClient extends EventEmitter {
     options: Partial<WhisperTranscribeRequest> = {},
     onProgress?: (progress: TranscribeProgress) => void
   ): Promise<WhisperTranscribeResponse> {
-    const taskId = GeneralUtils.generateId();
+    const jobId = GeneralUtils.generateId();
     
     try {
       // 验证文件
       FileUtils.validateAudioFile(filePath);
       
-      // 创建任务
-      const task: TranscribeTask = {
-        id: taskId,
+      // 创建转写任务
+      const job: TranscriptionJob = {
+        id: jobId,
         filePath,
         status: 'pending',
         progress: {
@@ -110,8 +110,8 @@ export class WhisperAPIClient extends EventEmitter {
         createdAt: new Date()
       };
       
-      this.tasks.set(taskId, task);
-      this.emit('transcribe:start', taskId, filePath);
+      this.jobs.set(jobId, job);
+      this.emit('transcribe:start', jobId, filePath);
       
       // 构建请求参数
       const requestParams = RequestUtils.buildTranscribeRequest(
@@ -121,20 +121,20 @@ export class WhisperAPIClient extends EventEmitter {
       );
       
       // 执行转写
-      const result = await this.executeTranscribe(taskId, requestParams, onProgress);
+      const result = await this.executeTranscribe(jobId, requestParams, onProgress);
       
       // 更新任务状态
-      task.status = 'completed';
-      task.result = result;
-      task.completedAt = new Date();
-      task.progress = {
+      job.status = 'completed';
+      job.result = result;
+      job.completedAt = new Date();
+      job.progress = {
         progress: 100,
         status: 'completed',
         message: '转写完成'
       };
       
-      this.tasks.set(taskId, task);
-      this.emit('transcribe:complete', taskId, result);
+      this.jobs.set(jobId, job);
+      this.emit('transcribe:complete', jobId, result);
       
       return result;
       
@@ -142,26 +142,26 @@ export class WhisperAPIClient extends EventEmitter {
       // 处理错误
       const errorMessage = ErrorHandler.getUserFriendlyMessage(error as Error);
       
-      const task = this.tasks.get(taskId);
-      if (task) {
-        task.status = 'error';
-        task.error = errorMessage;
-        task.completedAt = new Date();
-        task.progress = {
+      const job = this.jobs.get(jobId);
+      if (job) {
+        job.status = 'error';
+        job.error = errorMessage;
+        job.completedAt = new Date();
+        job.progress = {
           progress: 0,
           status: 'error',
           message: errorMessage,
           error: errorMessage
         };
         
-        this.tasks.set(taskId, task);
+        this.jobs.set(jobId, job);
       }
       
-      this.emit('transcribe:error', taskId, errorMessage);
+      this.emit('transcribe:error', jobId, errorMessage);
       throw error;
     } finally {
       // 清理资源
-      this.abortControllers.delete(taskId);
+      this.abortControllers.delete(jobId);
     }
   }
 
@@ -169,12 +169,12 @@ export class WhisperAPIClient extends EventEmitter {
    * 执行转写请求
    */
   private async executeTranscribe(
-    taskId: string,
+    jobId: string,
     requestParams: WhisperTranscribeRequest,
     onProgress?: (progress: TranscribeProgress) => void
   ): Promise<WhisperTranscribeResponse> {
     const abortController = new AbortController();
-    this.abortControllers.set(taskId, abortController);
+    this.abortControllers.set(jobId, abortController);
     
     return RetryHandler.withRetry(
       async () => {
@@ -184,7 +184,7 @@ export class WhisperAPIClient extends EventEmitter {
         }
         
         // 更新进度
-        this.updateProgress(taskId, {
+        this.updateProgress(jobId, {
           progress: 10,
           status: 'uploading',
           message: '正在上传文件...'
@@ -206,7 +206,7 @@ export class WhisperAPIClient extends EventEmitter {
         });
         
         // 更新进度
-        this.updateProgress(taskId, {
+        this.updateProgress(jobId, {
           progress: 50,
           status: 'processing',
           message: '正在处理音频...'
@@ -217,7 +217,7 @@ export class WhisperAPIClient extends EventEmitter {
         ResponseUtils.validateTranscribeResponse(result);
         
         // 更新进度
-        this.updateProgress(taskId, {
+        this.updateProgress(jobId, {
           progress: 100,
           status: 'completed',
           message: '转写完成'
@@ -322,59 +322,59 @@ export class WhisperAPIClient extends EventEmitter {
   /**
    * 取消转写任务
    */
-  cancelTranscribe(taskId: string): boolean {
-    const task = this.tasks.get(taskId);
-    if (!task) {
+  cancelTranscribe(jobId: string): boolean {
+    const job = this.jobs.get(jobId);
+    if (!job) {
       return false;
     }
     
     // 取消请求
-    const abortController = this.abortControllers.get(taskId);
+    const abortController = this.abortControllers.get(jobId);
     if (abortController) {
       abortController.abort();
-      this.abortControllers.delete(taskId);
+      this.abortControllers.delete(jobId);
     }
     
     // 更新任务状态
-    task.status = 'cancelled';
-    task.completedAt = new Date();
-    task.progress = {
+    job.status = 'cancelled';
+    job.completedAt = new Date();
+    job.progress = {
       progress: 0,
       status: 'error',
       message: '任务已取消'
     };
     
-    this.tasks.set(taskId, task);
-    this.emit('transcribe:cancel', taskId);
+    this.jobs.set(jobId, job);
+    this.emit('transcribe:cancel', jobId);
     
     return true;
   }
 
   /**
-   * 获取任务状态
+   * 获取转写任务状态
    */
-  getTask(taskId: string): TranscribeTask | undefined {
-    return this.tasks.get(taskId);
+  getTranscriptionJob(jobId: string): TranscriptionJob | undefined {
+    return this.jobs.get(jobId);
   }
 
   /**
-   * 获取所有任务
+   * 获取所有转写任务
    */
-  getAllTasks(): TranscribeTask[] {
-    return Array.from(this.tasks.values());
+  getAllTranscriptionJobs(): TranscriptionJob[] {
+    return Array.from(this.jobs.values());
   }
 
   /**
-   * 清理已完成的任务
+   * 清理已完成的转写任务
    */
-  cleanupTasks(): void {
+  cleanupJobs(): void {
     const now = Date.now();
     const maxAge = 24 * 60 * 60 * 1000; // 24小时
     
-    for (const [taskId, task] of this.tasks.entries()) {
-      if (task.completedAt && (now - task.completedAt.getTime()) > maxAge) {
-        this.tasks.delete(taskId);
-        this.abortControllers.delete(taskId);
+    for (const [jobId, job] of this.jobs.entries()) {
+      if (job.completedAt && (now - job.completedAt.getTime()) > maxAge) {
+        this.jobs.delete(jobId);
+        this.abortControllers.delete(jobId);
       }
     }
   }
@@ -461,20 +461,20 @@ export class WhisperAPIClient extends EventEmitter {
   }
 
   /**
-   * 更新任务进度
+   * 更新转写任务进度
    */
   private updateProgress(
-    taskId: string,
+    jobId: string,
     progress: TranscribeProgress,
     onProgress?: (progress: TranscribeProgress) => void
   ): void {
-    const task = this.tasks.get(taskId);
-    if (task) {
-      task.progress = progress;
-      this.tasks.set(taskId, task);
+    const job = this.jobs.get(jobId);
+    if (job) {
+      job.progress = progress;
+      this.jobs.set(jobId, job);
     }
     
-    this.emit('transcribe:progress', taskId, progress);
+    this.emit('transcribe:progress', jobId, progress);
     
     if (onProgress) {
       onProgress(progress);
@@ -517,12 +517,12 @@ export class WhisperAPIClient extends EventEmitter {
     this.stopHealthCheck();
     
     // 取消所有任务
-    for (const taskId of this.tasks.keys()) {
-      this.cancelTranscribe(taskId);
+    for (const jobId of this.jobs.keys()) {
+      this.cancelTranscribe(jobId);
     }
     
     // 清理资源
-    this.tasks.clear();
+    this.jobs.clear();
     this.abortControllers.clear();
     this.modelsCache = undefined;
     this.lastHealthCheck = undefined;

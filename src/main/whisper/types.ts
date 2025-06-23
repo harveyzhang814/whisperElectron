@@ -108,23 +108,23 @@ export interface TranscribeProgress {
 }
 
 // 转写任务状态类型
-export interface TranscribeTask {
+export interface TranscriptionJob {
   /** 任务ID */
   id: string;
   /** 文件路径 */
   filePath: string;
   /** 任务状态 */
-  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled';
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'cancelled';
   /** 进度信息 */
   progress: TranscribeProgress;
-  /** 转写结果 */
-  result?: WhisperTranscribeResponse;
-  /** 错误信息 */
-  error?: string;
   /** 创建时间 */
   createdAt: Date;
   /** 完成时间 */
   completedAt?: Date;
+  /** 转写结果 */
+  result?: WhisperTranscribeResponse;
+  /** 错误信息 */
+  error?: string;
 }
 
 // API 客户端配置类型
@@ -172,11 +172,11 @@ export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 // 事件类型
 export type WhisperAPIEvents = {
-  'transcribe:start': (taskId: string, filePath: string) => void;
-  'transcribe:progress': (taskId: string, progress: TranscribeProgress) => void;
-  'transcribe:complete': (taskId: string, result: WhisperTranscribeResponse) => void;
-  'transcribe:error': (taskId: string, error: string) => void;
-  'transcribe:cancel': (taskId: string) => void;
+  'transcribe:start': (jobId: string, filePath: string) => void;
+  'transcribe:progress': (jobId: string, progress: TranscribeProgress) => void;
+  'transcribe:complete': (jobId: string, result: WhisperTranscribeResponse) => void;
+  'transcribe:error': (jobId: string, error: string) => void;
+  'transcribe:cancel': (jobId: string) => void;
   'models:update': (models: WhisperModel[]) => void;
   'health:update': (health: WhisperHealthResponse) => void;
 }; 
