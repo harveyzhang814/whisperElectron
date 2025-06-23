@@ -27,11 +27,6 @@ const mockElectronAPI = {
     console.log('✓ updateWhisperConfig called with:', JSON.stringify(config, null, 2));
     return { isValid: true };
   },
-  
-  testWhisperConnection: async () => {
-    console.log('✓ testWhisperConnection called');
-    return { success: true, models: ['tiny', 'base', 'small', 'medium', 'large'] };
-  }
 };
 
 // Demo the API integration
@@ -52,10 +47,6 @@ async function demoIntegration() {
     healthCheckInterval: 90000
   });
   console.log('   Update result:', updateResult);
-  
-  console.log('\n3. Testing testWhisperConnection...');
-  const testResult = await mockElectronAPI.testWhisperConnection();
-  console.log('   Test result:', testResult);
   
   console.log('\n=== Integration Demo Completed ===');
   console.log('\nNote: This demo shows the expected behavior of the');

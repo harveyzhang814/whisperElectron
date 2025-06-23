@@ -10,141 +10,169 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
-  z-index: 999;
-}
-
-.modal-container {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: var(--background-color);
-  border: 2px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.3),
-    0 10px 10px -5px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-  padding: 1.5rem;
-  width: 90%;
-  max-width: 700px;
-  max-height: 80vh;
-  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
   z-index: 1000;
-  animation: modalFadeIn 0.3s ease-out;
+  animation: fadeIn 0.2s ease-out;
 }
 
-@keyframes modalFadeIn {
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.modal-container {
+  position: relative;
+  width: 500px;
+  max-width: 90vw;
+  max-height: 90vh;
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.2s ease-out;
+  transform-origin: center;
+  margin: 0 auto;
+  color: var(--text-primary);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
 /* Modal Header */
 .modal-header {
+  position: sticky;
+  top: 0;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  border-bottom: 2px solid var(--border-color);
-  padding-bottom: 1rem;
-  background: linear-gradient(135deg, var(--toolbar-background) 0%, transparent 100%);
-  margin: -1.5rem -1.5rem 1.5rem -1.5rem;
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-  border-radius: 10px 10px 0 0;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--toolbar-background);
+  backdrop-filter: blur(10px);
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  z-index: 2;
 }
 
 .modal-header h2 {
+  font-size: 15px;
+  font-weight: 500;
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
   color: var(--text-primary);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Close Button */
 .close-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--border-color);
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0.5rem;
+  background: none;
+  border: none;
   color: var(--text-secondary);
-  transition: all 0.2s;
-  border-radius: 6px;
-  width: 36px;
-  height: 36px;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 12px;
+  transition: all 0.2s;
 }
 
 .close-button:hover {
+  background-color: var(--hover-background);
   color: var(--text-primary);
-  background-color: var(--toolbar-background);
-  border-color: var(--text-secondary);
-  transform: scale(1.05);
+}
+
+/* Modal Content Wrapper */
+.modal-content-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Modal Content */
 .modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 24px;
 }
 
-/* Section Styling */
+/* Form Styles */
 .settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   background-color: var(--toolbar-background);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 16px;
 }
 
 .settings-section h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1rem;
+  margin: 0;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border-color);
-  padding-bottom: 0.5rem;
 }
 
-/* Form Elements */
 .form-group {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
+  font-size: 13px;
+  color: var(--text-secondary);
   font-weight: 500;
-  color: var(--text-primary);
 }
 
 .form-group input[type="text"],
 .form-group input[type="url"],
 .form-group input[type="number"],
 .form-group select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.5rem 0.75rem;
+  padding: 8px 12px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-size: 0.875rem;
   background-color: var(--background-color);
   color: var(--text-primary);
+  font-size: 13px;
   transition: all 0.2s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 32px;
+}
+
+.form-group input[type="text"]:hover,
+.form-group input[type="url"]:hover,
+.form-group input[type="number"]:hover,
+.form-group select:hover {
+  border-color: var(--text-secondary);
 }
 
 .form-group input[type="text"]:focus,
@@ -152,12 +180,44 @@
 .form-group input[type="number"]:focus,
 .form-group select:focus {
   outline: none;
-  border-color: var(--text-secondary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* 确保所有输入框和选择框有一致的高度 */
+.form-group select {
+  height: 32px;
+  padding: 4px 12px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+/* 修复数字输入框的箭头样式 */
+.form-group input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.form-group input[type="number"]::-webkit-outer-spin-button,
+.form-group input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* 确保复选框和标签对齐 */
+.form-group label:has(input[type="checkbox"]) {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px 0;
 }
 
 .form-group input[type="checkbox"] {
-  margin-right: 0.5rem;
+  margin: 0 8px 0 0;
+  cursor: pointer;
 }
 
 .form-group small {
@@ -169,54 +229,43 @@
 
 /* Buttons */
 .btn {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--border-color);
+  padding: 6px 12px;
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
   background-color: var(--background-color);
+  border: 1px solid var(--border-color);
   color: var(--text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.btn:hover:not(:disabled) {
+.btn:hover {
+  background-color: var(--hover-background);
   border-color: var(--text-secondary);
-  background-color: var(--toolbar-background);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
 }
 
 .btn-primary {
-  background-color: #10b981;
+  background-color: #3b82f6;
+  border-color: #3b82f6;
   color: white;
-  border-color: #10b981;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background-color: #059669;
-  border-color: #059669;
+.btn-primary:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
 }
 
 /* Action Buttons */
 .modal-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 2px solid var(--border-color);
-  background: linear-gradient(135deg, transparent 0%, var(--toolbar-background) 100%);
-  margin: 1rem -1.5rem -1.5rem -1.5rem;
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
-  border-radius: 0 0 10px 10px;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px;
+  background-color: var(--toolbar-background);
+  border-top: 1px solid var(--border-color);
+  z-index: 2;
 }
 
 .modal-actions .btn {
@@ -225,30 +274,28 @@
 
 /* Messages */
 .message {
-  padding: 0.75rem;
+  padding: 12px;
   border-radius: 6px;
-  margin-top: 1rem;
-  font-size: 0.875rem;
-  border: 1px solid;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  margin-top: 8px;
 }
 
 .message-error {
-  background-color: #fef2f2;
-  border-color: #fecaca;
-  color: #dc2626;
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .message-warning {
-  background-color: #fffbeb;
-  border-color: #fed7aa;
-  color: #d97706;
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .message-success {
-  background-color: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #16a34a;
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .message div {
@@ -259,25 +306,37 @@
   margin-bottom: 0;
 }
 
+/* Scrollbar Styles */
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+  border: 2px solid var(--background-color);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .modal-container {
     width: 95%;
     max-width: none;
+    height: 90vh;
     margin: 1rem;
-    border-radius: 8px;
   }
   
-  .modal-header {
-    border-radius: 6px 6px 0 0;
-  }
-  
-  .modal-actions {
-    border-radius: 0 0 6px 6px;
+  .modal-content {
+    padding: 1rem;
   }
   
   .modal-actions {
     flex-direction: column;
+    padding: 1rem;
   }
   
   .modal-actions .btn {
@@ -285,68 +344,58 @@
   }
 }
 
-/* Shortcut Settings Specific Styles */
+/* Shortcut Settings Styles */
 .shortcut-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 16px;
 }
 
 .shortcut-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
+  padding: 12px;
   background-color: var(--toolbar-background);
-  border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s;
+}
+
+.shortcut-item:hover {
+  background-color: var(--hover-background);
 }
 
 .shortcut-description {
-  font-size: 0.875rem;
+  font-size: 14px;
   color: var(--text-primary);
 }
 
 .shortcut-controls {
   display: flex;
-  gap: 0.75rem;
+  gap: 8px;
   align-items: center;
 }
 
 .shortcut-key {
-  padding: 0.5rem 0.75rem;
-  background-color: var(--background-color);
-  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
-  font-size: 0.875rem;
-  min-width: 120px;
+  font-size: 13px;
+  min-width: 80px;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: white;
 }
 
 .shortcut-key:hover {
-  border-color: var(--text-secondary);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .shortcut-key.recording {
-  background-color: var(--status-background);
-  border-color: var(--text-secondary);
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-  }
+  background-color: rgba(0, 122, 255, 0.3);
+  border-color: #007aff;
+  color: white;
 } 

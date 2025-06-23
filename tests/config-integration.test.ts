@@ -15,7 +15,6 @@ const mockIpcRenderer = {
 const mockElectron = {
   getWhisperConfig: () => mockIpcRenderer.invoke('config:getWhisper'),
   updateWhisperConfig: (config: any) => mockIpcRenderer.invoke('config:updateWhisper', config),
-  testWhisperConnection: () => mockIpcRenderer.invoke('config:testWhisperConnection')
 };
 
 // Mock window.electron
@@ -67,16 +66,6 @@ describe('Configuration Integration', () => {
     const result = await window.electron.updateWhisperConfig(config);
     
     expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('config:updateWhisper', config);
-    expect(result).toEqual(mockResult);
-  });
-
-  it('should call testWhisperConnection IPC', async () => {
-    const mockResult = { success: true, models: ['base', 'small'] };
-    mockIpcRenderer.invoke.mockResolvedValue(mockResult);
-
-    const result = await window.electron.testWhisperConnection();
-    
-    expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('config:testWhisperConnection');
     expect(result).toEqual(mockResult);
   });
 }); 

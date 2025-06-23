@@ -65,21 +65,6 @@ function getNestedValue(obj: any, path: string): any {
 }
 
 /**
- * Set nested object value by path
- */
-function setNestedValue(obj: any, path: string, value: any): void {
-  const keys = path.split('.');
-  const lastKey = keys.pop()!;
-  const target = keys.reduce((current, key) => {
-    if (!current[key]) {
-      current[key] = {};
-    }
-    return current[key];
-  }, obj);
-  target[lastKey] = value;
-}
-
-/**
  * Validate a single configuration value
  */
 function validateValue(value: any, rule: any): string | null {
@@ -152,7 +137,7 @@ export function validateConfig(config: AppConfig): ConfigValidationResult {
 /**
  * Validate configuration consistency
  */
-function validateConfigConsistency(config: AppConfig, errors: string[], warnings: string[]): void {
+function validateConfigConsistency(config: AppConfig, _errors: string[], warnings: string[]): void {
   const { whisper } = config;
 
   // Check if health check interval is reasonable compared to timeout
@@ -173,6 +158,23 @@ function validateConfigConsistency(config: AppConfig, errors: string[], warnings
   // Check if base URL is localhost in production-like environment
   if (whisper.baseUrl.includes('localhost') && process.env.NODE_ENV === 'production') {
     warnings.push('生产环境中使用 localhost，请确认配置正确');
+  }
+
+  // 检查 Whisper API 配置一致性
+  if (config.whisper) {
+    const apiConfig = config.whisper;
+    
+    // 检查模型和语言的一致性
+    if (apiConfig.defaultModel && apiConfig.language) {
+      // 这里可以添加模型和语言的兼容性检查
+      // 例如：某些模型可能不支持某些语言
+    }
+    
+    // 检查输出格式和单词时间戳的一致性
+    if (apiConfig.outputFormat === 'text') {
+      // 纯文本格式不支持复杂功能
+      warnings.push('纯文本格式功能有限，建议使用 JSON 格式以获得更多信息');
+    }
   }
 }
 

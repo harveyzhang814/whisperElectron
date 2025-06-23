@@ -3,9 +3,11 @@ import { ShortcutManager } from './shortcut';
 import { TaskManager } from './taskManager';
 import { quitApp } from './index';
 import { configManager } from './config';
+import { whisperManager } from './whisper/manager';
 
 // 初始化所有 IPC 处理器
 export function initializeIPC(shortcutManager: ShortcutManager) {
+
   // 应用相关的 IPC
   ipcMain.handle('app:quit', async () => {
     await quitApp();
@@ -56,14 +58,95 @@ export function initializeIPC(shortcutManager: ShortcutManager) {
 
   ipcMain.handle('config:updateWhisper', async (_event, whisperConfig) => {
     await configManager.initialize();
-    return await configManager.updateConfigSection('whisper', whisperConfig);
+    const result = await configManager.updateConfigSection('whisper', whisperConfig);
+    whisperManager.reinitializeClient();
+    return result;
   });
 
-  ipcMain.handle('config:testWhisperConnection', async () => {
-    await configManager.initialize();
-    const whisper = configManager.getConfigSection('whisper');
-    // 这里可以实现实际的 API 测试逻辑，暂时返回 success: true
-    // TODO: 可用 fetch/axios 请求 whisper.baseUrl/health
-    return { success: true, models: [whisper.defaultModel] };
+  // Whisper 转写相关的 IPC
+  ipcMain.handle('whisper:transcribe', async (event, filePath: string, options = {}) => {
+    try {
+      const result = await whisperManager.transcribe(filePath, options, (progress) => {
+        event.sender.send('whisper:progress', progress);
+      });
+      return { success: true, result };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:cancel', async (_, taskId: string) => {
+    try {
+      const cancelled = whisperManager.cancelTranscribe(taskId);
+      return { success: cancelled };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:getTask', async (_, taskId: string) => {
+    try {
+      const task = whisperManager.getTask(taskId);
+      return { success: true, task };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:getAllTasks', async () => {
+    try {
+      const tasks = whisperManager.getAllTasks();
+      return { success: true, tasks };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:getModels', async () => {
+    try {
+      const models = await whisperManager.getModels();
+      return { success: true, models };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:checkHealth', async () => {
+    try {
+      const health = await whisperManager.checkHealth();
+      return { success: true, health };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:testConnection', async () => {
+    try {
+      const connected = await whisperManager.testConnection();
+      return { success: connected };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   });
 } 

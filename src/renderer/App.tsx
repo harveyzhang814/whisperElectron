@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShortcutSettings } from './components/ShortcutSettings';
 import { ApiSettings } from './components/ApiSettings';
+import { WhisperTest } from './components/WhisperTest';
 import { TaskList } from './components/TaskList';
 import { useTasks } from './hooks/useTasks';
 import { useRecordingTask } from './hooks/useRecordingTask';
@@ -10,7 +11,7 @@ interface RecordingStatus {
   isRecording: boolean;
 }
 
-type SettingsType = 'shortcuts' | 'api' | null;
+type SettingsType = 'shortcuts' | 'api' | 'test' | null;
 
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState<SettingsType>(null);
@@ -197,6 +198,12 @@ const App: React.FC = () => {
             >
               API
             </button>
+            <button 
+              className={`settings-button ${showSettings === 'test' ? 'active' : ''}`}
+              onClick={() => setShowSettings(showSettings === 'test' ? null : 'test')}
+            >
+              Test
+            </button>
           </div>
           <button 
             className="minimize-button"
@@ -235,6 +242,9 @@ const App: React.FC = () => {
       )}
       {showSettings === 'api' && (
         <ApiSettings onClose={() => setShowSettings(null)} />
+      )}
+      {showSettings === 'test' && (
+        <WhisperTest onClose={() => setShowSettings(null)} />
       )}
     </div>
   );

@@ -5,6 +5,77 @@ interface RecordingResult {
   isRecording?: boolean;
 }
 
+// Whisper 相关类型定义
+interface WhisperTranscribeRequest {
+  file: string;
+  model?: string;
+  language?: string;
+  output_format?: 'txt' | 'vtt' | 'srt' | 'json';
+  word_timestamps?: boolean;
+  condition_on_previous_text?: boolean;
+  initial_prompt?: string;
+  temperature?: number;
+  compression_ratio_threshold?: number;
+  logprob_threshold?: number;
+  no_speech_threshold?: number;
+}
+
+interface WhisperTranscribeResponse {
+  text: string;
+  language?: string;
+  language_probability?: number;
+  segments?: WhisperSegment[];
+  word_timestamps?: WhisperWordTimestamp[];
+}
+
+interface WhisperSegment {
+  start: number;
+  end: number;
+  text: string;
+  confidence?: number;
+}
+
+interface WhisperWordTimestamp {
+  word: string;
+  start: number;
+  end: number;
+  confidence?: number;
+}
+
+interface WhisperModel {
+  name: string;
+  description?: string;
+  languages?: string[];
+  size?: string;
+  available?: boolean;
+}
+
+interface WhisperHealthResponse {
+  status: 'healthy' | 'unhealthy';
+  version?: string;
+  models?: WhisperModel[];
+  error?: string;
+  timestamp?: number;
+}
+
+interface TranscribeProgress {
+  progress: number;
+  status: 'uploading' | 'processing' | 'completed' | 'error';
+  message: string;
+  error?: string;
+}
+
+interface TranscribeTask {
+  id: string;
+  filePath: string;
+  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled';
+  progress: TranscribeProgress;
+  result?: WhisperTranscribeResponse;
+  error?: string;
+  createdAt: Date;
+  completedAt?: Date;
+}
+
 interface ElectronAPI {
   // App lifecycle
   onReady: (callback: () => void) => void;
@@ -48,7 +119,21 @@ interface ElectronAPI {
   // Whisper 配置相关方法
   getWhisperConfig: () => Promise<any>;
   updateWhisperConfig: (config: any) => Promise<any>;
-  testWhisperConnection: () => Promise<any>;
+
+  // Whisper 转写相关方法
+  whisperTranscribe: (filePath: string, options?: Partial<WhisperTranscribeRequest>) => Promise<{ success: boolean; result?: WhisperTranscribeResponse; error?: string }>;
+  whisperCancel: (taskId: string) => Promise<{ success: boolean; error?: string }>;
+  whisperGetTask: (taskId: string) => Promise<{ success: boolean; task?: TranscribeTask; error?: string }>;
+  whisperGetAllTasks: () => Promise<{ success: boolean; tasks?: TranscribeTask[]; error?: string }>;
+  whisperGetModels: () => Promise<{ success: boolean; models?: WhisperModel[]; error?: string }>;
+  whisperCheckHealth: () => Promise<{ success: boolean; health?: WhisperHealthResponse; error?: string }>;
+  whisperTestConnection: () => Promise<{ success: boolean; error?: string }>;
+
+  // Whisper 事件监听方法
+  onWhisperProgress: (callback: (progress: TranscribeProgress) => void) => void;
+  onWhisperComplete: (callback: (result: WhisperTranscribeResponse) => void) => void;
+  onWhisperError: (callback: (error: string) => void) => void;
+  removeWhisperListeners: () => void;
 }
 
 interface Window {
