@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import './ShortcutSettings.css';
+import './Modal.css';
 
 interface ShortcutSettingsProps {
   onClose: () => void;
@@ -56,33 +56,39 @@ export const ShortcutSettings: React.FC<ShortcutSettingsProps> = ({ onClose }) =
   };
 
   return (
-    <div className="shortcut-settings">
-      <div className="shortcut-settings-header">
-        <h2>快捷键设置</h2>
-        <button className="close-button" onClick={onClose}>×</button>
-      </div>
-      <div className="shortcut-list">
-        {shortcuts.map((shortcut) => (
-          <div key={shortcut.action} className="shortcut-item">
-            <span className="shortcut-description">{shortcut.description}</span>
-            <div className="shortcut-controls">
-              <button
-                className={`shortcut-key ${recordingAction === shortcut.action ? 'recording' : ''}`}
-                onClick={() => startRecording(shortcut.action)}
-                onKeyDown={(e) => handleKeyDown(e, shortcut)}
-                tabIndex={0}
-              >
-                {recordingAction === shortcut.action ? '请按下新的快捷键...' : shortcut.key}
-              </button>
-              <button
-                className={`toggle-button ${shortcut.enabled ? 'enabled' : 'disabled'}`}
-                onClick={() => toggleShortcut(shortcut)}
-              >
-                {shortcut.enabled ? '启用' : '禁用'}
-              </button>
+    <div className="modal-overlay">
+      <div className="modal-container">
+        <div className="modal-header">
+          <h2>快捷键设置</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-content-wrapper">
+          <div className="modal-content">
+            <div className="shortcut-list">
+              {shortcuts.map((shortcut) => (
+                <div key={shortcut.action} className="shortcut-item">
+                  <span className="shortcut-description">{shortcut.description}</span>
+                  <div className="shortcut-controls">
+                    <button
+                      className={`shortcut-key ${recordingAction === shortcut.action ? 'recording' : ''}`}
+                      onClick={() => startRecording(shortcut.action)}
+                      onKeyDown={(e) => handleKeyDown(e, shortcut)}
+                      tabIndex={0}
+                    >
+                      {recordingAction === shortcut.action ? '请按下新的快捷键...' : shortcut.key}
+                    </button>
+                    <button
+                      className={`btn ${shortcut.enabled ? 'btn-primary' : ''}`}
+                      onClick={() => toggleShortcut(shortcut)}
+                    >
+                      {shortcut.enabled ? '启用' : '禁用'}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );

@@ -56,4 +56,33 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Task refresh event
   onTaskRefresh: (callback: () => void) => ipcRenderer.on('task:refresh', callback),
+
+  // Whisper 配置相关
+  getWhisperConfig: () => ipcRenderer.invoke('config:getWhisper'),
+  updateWhisperConfig: (config: any) => ipcRenderer.invoke('config:updateWhisper', config),
+
+  // Whisper 转写相关
+  whisperTranscribe: (filePath: string, options?: any) => ipcRenderer.invoke('whisper:transcribe', filePath, options),
+  whisperCancel: (jobId: string) => ipcRenderer.invoke('whisper:cancel', jobId),
+  whisperGetJob: (jobId: string) => ipcRenderer.invoke('whisper:getJob', jobId),
+  whisperGetAllJobs: () => ipcRenderer.invoke('whisper:getAllJobs'),
+  whisperGetModels: () => ipcRenderer.invoke('whisper:getModels'),
+  whisperCheckHealth: () => ipcRenderer.invoke('whisper:checkHealth'),
+  whisperTestConnection: () => ipcRenderer.invoke('whisper:testConnection'),
+
+  // Whisper 事件监听
+  onWhisperProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('whisper:progress', (_event, progress) => callback(progress));
+  },
+  onWhisperComplete: (callback: (result: any) => void) => {
+    ipcRenderer.on('whisper:complete', (_event, result) => callback(result));
+  },
+  onWhisperError: (callback: (error: any) => void) => {
+    ipcRenderer.on('whisper:error', (_event, error) => callback(error));
+  },
+  removeWhisperListeners: () => {
+    ipcRenderer.removeAllListeners('whisper:progress');
+    ipcRenderer.removeAllListeners('whisper:complete');
+    ipcRenderer.removeAllListeners('whisper:error');
+  },
 }); 

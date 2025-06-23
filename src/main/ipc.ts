@@ -2,9 +2,12 @@ import { ipcMain } from 'electron';
 import { ShortcutManager } from './shortcut';
 import { TaskManager } from './taskManager';
 import { quitApp } from './index';
+import { configManager } from './config';
+import { whisperManager } from './whisper/manager';
 
 // 初始化所有 IPC 处理器
 export function initializeIPC(shortcutManager: ShortcutManager) {
+
   // 应用相关的 IPC
   ipcMain.handle('app:quit', async () => {
     await quitApp();
@@ -45,5 +48,114 @@ export function initializeIPC(shortcutManager: ShortcutManager) {
 
   ipcMain.handle('task:getCurrentRecording', async () => {
     return await TaskManager.getCurrentRecordingTask();
+  });
+
+  // Whisper 配置相关的 IPC
+  ipcMain.handle('config:getWhisper', async () => {
+    await configManager.initialize();
+    return configManager.getConfigSection('whisper');
+  });
+
+  ipcMain.handle('config:updateWhisper', async (_event, whisperConfig) => {
+    await configManager.initialize();
+    const result = await configManager.updateConfigSection('whisper', whisperConfig);
+    whisperManager.reinitializeClient();
+    return result;
+  });
+
+  // Whisper 转写相关的 IPC
+  ipcMain.handle('whisper:transcribe', async (event, filePath: string, options = {}) => {
+    try {
+      const result = await whisperManager.transcribe(filePath, options, (progress) => {
+        event.sender.send('whisper:progress', progress);
+      });
+      return { success: true, result };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:cancel', async (_, jobId: string) => {
+    try {
+      const cancelled = whisperManager.cancelTranscribe(jobId);
+      return { success: cancelled };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:getJob', async (_, jobId: string) => {
+    try {
+      const job = whisperManager.getTranscriptionJob(jobId);
+      return { success: true, job };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:getAllJobs', async () => {
+    try {
+      const jobs = whisperManager.getAllTranscriptionJobs();
+      return { success: true, jobs };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:getModels', async () => {
+    try {
+      const models = await whisperManager.getModels();
+      return { success: true, models };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:checkHealth', async () => {
+    try {
+      const health = await whisperManager.checkHealth();
+      return { success: true, health };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  });
+
+  ipcMain.handle('whisper:testConnection', async () => {
+    try {
+      const baseConfig = configManager.getConfigSection('whisper');
+      const config = {
+        ...baseConfig,
+        retryDelay: 1000,
+        defaultLanguage: baseConfig.language || 'auto',
+        defaultOutputFormat: 'json' as const,
+        enableWordTimestamps: false,
+        enableConfidence: false
+      };
+      const result = await whisperManager.testNewConnection(config);
+      return result;
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   });
 } 

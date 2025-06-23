@@ -300,3 +300,19 @@
 .task-button.delete:hover {
   background-color: #dc2626;
 } 
+
+.settings-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.settings-button.active {
+  background-color: var(--text-secondary);
+  color: var(--background-color);
+  border-color: var(--text-secondary);
+}
+
+.settings-button.active:hover {
+  background-color: var(--text-primary);
+  border-color: var(--text-primary);
+} 

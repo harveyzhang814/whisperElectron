@@ -1,4 +1,4 @@
-import { globalShortcut, Notification, BrowserWindow } from 'electron';
+import { globalShortcut, BrowserWindow } from 'electron';
 import { audioRecorder } from './audio';
 import { TaskManager } from './taskManager';
 
