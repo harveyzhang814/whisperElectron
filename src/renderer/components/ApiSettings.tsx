@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import './ApiSettings.css';
+import './Modal.css';
 
 interface WhisperAPIConfig {
   baseUrl: string;
@@ -108,12 +108,12 @@ export const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="api-settings">
-      <div className="api-settings-header">
+    <div className="modal-container">
+      <div className="modal-header">
         <h2>Whisper API 配置</h2>
         <button className="close-button" onClick={onClose}>×</button>
       </div>
-      <div className="api-settings-content">
+      <div className="modal-content">
         <div className="settings-section">
           <h3>连接设置</h3>
           <div className="form-group">
@@ -128,10 +128,10 @@ export const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
             <label>重试次数</label>
             <input type="number" value={config.retryAttempts} onChange={e => handleInputChange('retryAttempts', parseInt(e.target.value))} />
           </div>
-          <button onClick={testConnection} disabled={testStatus === 'testing'}>
+          <button className="btn" onClick={testConnection} disabled={testStatus === 'testing'}>
             {testStatus === 'testing' ? '测试中...' : '测试连接'}
           </button>
-          {testStatus !== 'idle' && <div>{testMessage}</div>}
+          {testStatus !== 'idle' && <div className={`message ${testStatus === 'success' ? 'message-success' : 'message-error'}`}>{testMessage}</div>}
         </div>
         <div className="settings-section">
           <h3>模型设置</h3>
@@ -173,12 +173,12 @@ export const ApiSettings: React.FC<ApiSettingsProps> = ({ onClose }) => {
             </div>
           )}
         </div>
-        {errors.length > 0 && <div className="error-messages">{errors.map((e, i) => <div key={i}>{e}</div>)}</div>}
-        {warnings.length > 0 && <div className="warning-messages">{warnings.map((w, i) => <div key={i}>{w}</div>)}</div>}
-        <div className="settings-actions">
-          <button onClick={resetToDefaults} disabled={isLoading}>重置为默认值</button>
-          <button onClick={onClose} disabled={isLoading}>取消</button>
-          <button onClick={saveConfig} disabled={isLoading}>保存配置</button>
+        {errors.length > 0 && <div className="message message-error">{errors.map((e, i) => <div key={i}>{e}</div>)}</div>}
+        {warnings.length > 0 && <div className="message message-warning">{warnings.map((w, i) => <div key={i}>{w}</div>)}</div>}
+        <div className="modal-actions">
+          <button className="btn" onClick={resetToDefaults} disabled={isLoading}>重置为默认值</button>
+          <button className="btn" onClick={onClose} disabled={isLoading}>取消</button>
+          <button className="btn btn-primary" onClick={saveConfig} disabled={isLoading}>保存配置</button>
         </div>
       </div>
     </div>
