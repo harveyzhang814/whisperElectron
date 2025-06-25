@@ -1,66 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Task } from '../types/task';
 import { useTasks } from '../hooks/useTasks';
-import { useRecordingTask } from '../hooks/useRecordingTask';
-
-interface RecordingStatus {
-  isRecording: boolean;
-}
+import { TaskStateTag } from './TaskStateTag';
 
 export const TaskList: React.FC = () => {
-  const { tasks, isLoading, error, refreshTasks } = useTasks();
-  const { setCurrentRecordingTask, loadCurrentTask, getCurrentRecordingTaskId } = useRecordingTask();
+  const { tasks, isLoading, error, deleteTask, loadTasks } = useTasks();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
-  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({ isRecording: false });
+  const [editingName, setEditingName] = useState('');
 
-  // 添加日志以追踪任务列表变化
-  useEffect(() => {
-    console.log('Tasks updated:', tasks);
+  // Add logging for tasks
+  React.useEffect(() => {
+    console.log('📋 [TaskList] Tasks updated:', {
+      count: tasks.length,
+      tasks: tasks.map(task => ({
+        id: task.id,
+        type: task.type,
+        state: task.state,
+        progress: task.progress,
+        name: task.metadata?.name,
+        createdAt: task.metadata?.createdAt,
+        extendedData: task.extendedData
+      }))
+    });
   }, [tasks]);
 
-  const handleStartRecording = async (task: Task) => {
+  const handleStartRecording = async (taskId: string) => {
     try {
-      console.log('Starting recording for task:', task);
-      // 先开始录音
-      const result = await window.electron.startRecording();
-      console.log('Start recording result:', result);
+      const result = await window.electron.startRecording(taskId);
       if (!result.success) {
-        // 如果录音失败，将任务状态改回backlog
-        await window.electron.updateTask(task.id, { status: 'backlog' });
-        await setCurrentRecordingTask(null);
-        refreshTasks();
         console.error('Failed to start recording:', result.error);
-      } else {
-        // 更新任务状态为录音中
-        await window.electron.updateTask(task.id, { status: 'recording' });
-        await setCurrentRecordingTask(task.id);
-        refreshTasks();
       }
     } catch (error) {
       console.error('Error starting recording:', error);
-      refreshTasks();
     }
   };
 
-  const handleStopRecording = async (task: Task) => {
+  const handleStopRecording = async (taskId: string) => {
     try {
-      const result = await window.electron.stopRecording();
-      console.log('Stop recording result:', result);
-      
-      // 重新获取最新的任务状态
-      await loadCurrentTask();
-      const currentTaskId = getCurrentRecordingTaskId();
-      
-      if (result.success && currentTaskId) {
-        // 如果停止成功，更新任务状态
-        await window.electron.updateTask(currentTaskId, { 
-          status: 'completed',
-          audioPath: result.path
-        });
-        await setCurrentRecordingTask(null);
-        refreshTasks();
-      } else {
+      const result = await window.electron.stopRecording(taskId);
+      if (!result.success) {
         console.error('Failed to stop recording:', result.error);
       }
     } catch (error) {
@@ -68,64 +46,47 @@ export const TaskList: React.FC = () => {
     }
   };
 
-  const handleCancelRecording = async (task: Task) => {
+  const handleCancelRecording = async () => {
     try {
       const result = await window.electron.cancelRecording();
-      
-      // 重新获取最新的任务状态
-      await loadCurrentTask();
-      const currentTaskId = getCurrentRecordingTaskId();
-      
-      if (currentTaskId) {
-        await window.electron.updateTask(currentTaskId, { status: 'backlog' });
-        await setCurrentRecordingTask(null);
-      }
       if (!result.success) {
         console.error('Failed to cancel recording:', result.error);
       }
-      refreshTasks();
+      await loadTasks();
     } catch (error) {
       console.error('Error canceling recording:', error);
     }
   };
 
-  const handleOpenAudio = (task: Task) => {
-    if (task.audioPath) {
-      window.electron.openAudioFile(task.audioPath);
-    }
+  const handleDeleteTask = async (taskId: string) => {
+    await deleteTask(taskId);
   };
 
-  const handleDeleteTask = async (task: Task) => {
-    try {
-      // 删除任务记录（taskManager 会自动处理音频文件的删除）
-      await window.electron.deleteTask(task.id);
-      // 重新加载任务列表
-      refreshTasks();
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    }
-  };
-
-  const handleTitleClick = (task: Task) => {
-    if (task.status === 'backlog' || task.status === 'completed') {
+  const handleNameClick = (task: Task) => {
+    if (task.state === 'CREATED' || task.state === 'COMPLETED' || task.state === 'CANCELLED') {
       setEditingTaskId(task.id);
-      setEditingTitle(task.title);
+      setEditingName(task.metadata.name);
     }
   };
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingTitle(e.target.value);
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditingName(e.target.value);
   };
 
-  const handleTitleBlur = async () => {
-    if (editingTaskId && editingTitle.trim()) {
-      await window.electron.updateTask(editingTaskId, { title: editingTitle.trim() });
-      refreshTasks();
+  const handleNameBlur = async () => {
+    if (editingTaskId && editingName.trim()) {
+      try {
+        await window.electron.updateTask(editingTaskId, { 
+          metadata: { name: editingName.trim() }
+        });
+      } catch (error) {
+        console.error('Error updating task name:', error);
+      }
     }
     setEditingTaskId(null);
   };
 
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.currentTarget.blur();
     } else if (e.key === 'Escape') {
@@ -133,8 +94,12 @@ export const TaskList: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const handleOpenAudio = (audioPath: string) => {
+    window.electron.openAudioFile(audioPath);
+  };
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
     return date.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
@@ -145,16 +110,37 @@ export const TaskList: React.FC = () => {
     });
   };
 
-  const getStatusText = (status: Task['status']) => {
-    switch (status) {
-      case 'backlog':
+  const getStateText = (state: string) => {
+    switch (state) {
+      case 'CREATED':
         return '待录音';
-      case 'recording':
+      case 'RUNNING':
         return '录音中';
-      case 'completed':
+      case 'COMPLETED':
         return '已完成';
+      case 'CANCELLED':
+        return '已取消';
+      case 'FAILED':
+        return '失败';
       default:
-        return status;
+        return state;
+    }
+  };
+
+  const getStateClass = (state: string) => {
+    switch (state) {
+      case 'CREATED':
+        return 'state-created';
+      case 'RUNNING':
+        return 'state-running';
+      case 'COMPLETED':
+        return 'state-completed';
+      case 'CANCELLED':
+        return 'state-cancelled';
+      case 'FAILED':
+        return 'state-failed';
+      default:
+        return 'state-unknown';
     }
   };
 
@@ -169,87 +155,98 @@ export const TaskList: React.FC = () => {
   if (tasks.length === 0) {
     return (
       <div className="empty-state">
-        暂无录音任务。点击"Create Memo Task"创建新任务。
+        点击"Start Recording"开始录音。
       </div>
     );
   }
 
   return (
-    <div className="task-items">
-      {tasks.map(task => (
-        <div key={task.id} className="task-item">
-          <div className="task-info">
-            {editingTaskId === task.id ? (
-              <input
-                type="text"
-                className="task-title-input"
-                value={editingTitle}
-                onChange={handleTitleChange}
-                onBlur={handleTitleBlur}
-                onKeyDown={handleTitleKeyDown}
-                autoFocus
-              />
-            ) : (
-              <div 
-                className="task-title"
-                onClick={() => handleTitleClick(task)}
-                style={{ cursor: (task.status === 'backlog' || task.status === 'completed') ? 'text' : 'default' }}
-              >
-                {task.title}
+    <div className="task-list">
+      {/* 任务列表 */}
+      <div className="task-items">
+        {tasks.map(task => (
+          <div key={task.id} className={`task-item ${getStateClass(task.state)}`}>
+            <div className="task-info">
+              {editingTaskId === task.id ? (
+                <input
+                  type="text"
+                  className="task-name-input"
+                  value={editingName}
+                  onChange={handleNameChange}
+                  onBlur={handleNameBlur}
+                  onKeyDown={handleNameKeyDown}
+                  autoFocus
+                />
+              ) : (
+                <div 
+                  className="task-name"
+                  onClick={() => handleNameClick(task)}
+                  style={{ cursor: (task.state === 'CREATED' || task.state === 'COMPLETED' || task.state === 'CANCELLED') ? 'text' : 'default' }}
+                >
+                  {task.metadata.name}
+                </div>
+              )}
+              <div className="task-meta-row">
+                <span className="task-date">
+                  {formatDate(task.metadata.createdAt)}
+                </span>
+                <TaskStateTag state={task.state} />
+                {task.progress > 0 && (
+                  <span className="task-progress">
+                    {Math.round(task.progress * 100)}%
+                  </span>
+                )}
               </div>
-            )}
-            <div className="task-id">{task.id}</div>
-            <div className="task-status">
-              <span className="task-status-text">
-                Created at：{formatDate(task.createdAt)}
-              </span>
-              <span className="task-status-text">
-                Status：{getStatusText(task.status)}
-              </span>
+              {/* <div className="task-id">{task.id}</div> */}
+              {task.error && (
+                <div className="task-error">
+                  Error: {task.error}
+                </div>
+              )}
+            </div>
+            <div className="task-actions">
+              {(task.state === 'CREATED' || task.state === 'CANCELLED') && (
+                <button
+                  className="task-button start"
+                  onClick={() => handleStartRecording(task.id)}
+                >
+                  Start
+                </button>
+              )}
+              {task.state === 'RUNNING' && (
+                <>
+                  <button
+                    className="task-button stop"
+                    onClick={() => handleStopRecording(task.id)}
+                  >
+                    Stop
+                  </button>
+                  <button
+                    className="task-button cancel"
+                    onClick={() => handleCancelRecording()}
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+              {task.recordingMetadata?.outputPath && (
+                <button
+                  className="task-button open"
+                  onClick={() => handleOpenAudio(task.recordingMetadata!.outputPath!)}
+                >
+                  Open
+                </button>
+              )}
+              <button
+                className="task-button delete"
+                onClick={() => handleDeleteTask(task.id)}
+              >
+                Delete
+              </button>
             </div>
           </div>
-          <div className="task-actions">
-            {task.status === 'backlog' && (
-              <button 
-                className="task-button start"
-                onClick={() => handleStartRecording(task)}
-              >
-                Start
-              </button>
-            )}
-            {task.status === 'recording' && (
-              <>
-                <button 
-                  className="task-button stop"
-                  onClick={() => handleStopRecording(task)}
-                >
-                  End
-                </button>
-                <button 
-                  className="task-button cancel"
-                  onClick={() => handleCancelRecording(task)}
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-            {task.status === 'completed' && task.audioPath && (
-              <button 
-                className="task-button open"
-                onClick={() => handleOpenAudio(task)}
-              >
-                Open File
-              </button>
-            )}
-            <button 
-              className="task-button delete"
-              onClick={() => handleDeleteTask(task)}
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }; 

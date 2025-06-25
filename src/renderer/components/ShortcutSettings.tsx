@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import './ShortcutSettings.css';
+import './Modal.css';
 
 interface ShortcutSettingsProps {
   onClose: () => void;
@@ -56,11 +56,14 @@ export const ShortcutSettings: React.FC<ShortcutSettingsProps> = ({ onClose }) =
   };
 
   return (
-    <div className="shortcut-settings">
-      <div className="shortcut-settings-header">
+    <div className="modal-overlay">
+      <div className="modal-container">
+        <div className="modal-header">
         <h2>快捷键设置</h2>
         <button className="close-button" onClick={onClose}>×</button>
       </div>
+        <div className="modal-content-wrapper">
+          <div className="modal-content">
       <div className="shortcut-list">
         {shortcuts.map((shortcut) => (
           <div key={shortcut.action} className="shortcut-item">
@@ -75,7 +78,7 @@ export const ShortcutSettings: React.FC<ShortcutSettingsProps> = ({ onClose }) =
                 {recordingAction === shortcut.action ? '请按下新的快捷键...' : shortcut.key}
               </button>
               <button
-                className={`toggle-button ${shortcut.enabled ? 'enabled' : 'disabled'}`}
+                      className={`btn ${shortcut.enabled ? 'btn-primary' : ''}`}
                 onClick={() => toggleShortcut(shortcut)}
               >
                 {shortcut.enabled ? '启用' : '禁用'}
@@ -83,6 +86,9 @@ export const ShortcutSettings: React.FC<ShortcutSettingsProps> = ({ onClose }) =
             </div>
           </div>
         ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
