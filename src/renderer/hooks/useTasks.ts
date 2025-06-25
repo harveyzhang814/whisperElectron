@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Task } from '../types/task';
 
-// 创建一个全局的事件总线来同步刷新
-const listeners = new Set<() => void>();
-
 export const useTasks = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -11,53 +8,72 @@ export const useTasks = () => {
 
   const loadTasks = useCallback(async () => {
     try {
-      console.log('Loading tasks...');
       setIsLoading(true);
       setError(null);
+      console.log('🔄 [useTasks] Loading tasks...');
+      
       const result = await window.electron.getAllTasks();
-      console.log('Tasks loaded:', result);
-      setTasks(result);
+      
+      if (result.success) {
+        const tasks = result.tasks || [];
+        console.log('✅ [useTasks] Tasks loaded successfully:', {
+          count: tasks.length,
+          tasks: tasks.map(task => ({
+            id: task.id,
+            type: task.type,
+            state: task.state,
+            progress: task.progress,
+            metadata: task.metadata,
+            extendedData: task.extendedData,
+            error: task.error
+          }))
+        });
+        setTasks(tasks);
+      } else {
+        console.error('❌ [useTasks] Failed to load tasks:', result.error);
+        setError(result.error || 'Failed to load tasks');
+        setTasks([]);
+      }
     } catch (err) {
-      console.error('Error loading tasks:', err);
+      console.error('❌ [useTasks] Error loading tasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
+      setTasks([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  const deleteTask = useCallback(async (taskId: string) => {
+    try {
+      const result = await window.electron.deleteTask(taskId);
+      
+      if (result.success) {
+        // 重新加载任务列表
+        await loadTasks();
+      } else {
+        setError(result.error || 'Failed to delete task');
+      }
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete task');
+    }
+  }, [loadTasks]);
+
   useEffect(() => {
     // 初始加载
     loadTasks();
 
-    // 添加监听器
-    const listener = () => {
-      console.log('Refresh triggered by event bus');
-      loadTasks();
-    };
-    listeners.add(listener);
-
-    // 添加 IPC 事件监听器
+    // 监听任务刷新事件
     window.electron.onTaskRefresh(() => {
-      console.log('Refresh triggered by IPC event');
       loadTasks();
     });
-
-    // 清理监听器
-    return () => {
-      listeners.delete(listener);
-    };
   }, [loadTasks]);
-
-  const refreshTasks = useCallback(() => {
-    console.log('Broadcasting refresh event...');
-    // 通知所有使用这个 hook 的组件刷新
-    listeners.forEach(listener => listener());
-  }, []);
 
   return {
     tasks,
     isLoading,
     error,
-    refreshTasks
+    loadTasks,
+    deleteTask
   };
 }; 

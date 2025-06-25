@@ -3,30 +3,16 @@ import { ShortcutSettings } from './components/ShortcutSettings';
 import { ApiSettings } from './components/ApiSettings';
 import { WhisperTest } from './components/WhisperTest';
 import { TaskList } from './components/TaskList';
-import { useTasks } from './hooks/useTasks';
 import { useRecordingTask } from './hooks/useRecordingTask';
 import './App.css';
-
-interface RecordingStatus {
-  isRecording: boolean;
-}
 
 type SettingsType = 'shortcuts' | 'api' | 'test' | null;
 
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState<SettingsType>(null);
-  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>({
-    isRecording: false,
-  });
-  const { refreshTasks } = useTasks();
-  const { setCurrentRecordingTask, currentTask, loadCurrentTask, getCurrentRecordingTaskId } = useRecordingTask();
+  const { currentTask } = useRecordingTask();
 
   useEffect(() => {
-    // 监听录音状态更新事件
-    window.electron.onRecordingStatus((status: RecordingStatus) => {
-      setRecordingStatus(status);
-    });
-
     // 监听托盘菜单事件
     window.electron.onRecordingStart(() => {
       handleStartRecording();
@@ -40,7 +26,6 @@ const App: React.FC = () => {
 
     return () => {
       // 清理事件监听
-      window.electron.removeRecordingStatusListener();
       window.electron.removeTrayListeners();
     };
   }, []);
@@ -51,55 +36,19 @@ const App: React.FC = () => {
 
   const handleStartRecording = async () => {
     try {
-      // First create a task
-      const now = new Date().toISOString();
-      const title = `Recording-${now}`;
-      const taskResult = await window.electron.createTask(title, 'recording');
-      console.log('Recording task created:', taskResult);
-      
-      // Set as current recording task
-      await setCurrentRecordingTask(taskResult.id);
-      refreshTasks();
-
-      // Then start recording
       const result = await window.electron.startRecording();
       if (!result.success) {
-        // If recording fails, update the task status back to backlog
-        await window.electron.updateTask(taskResult.id, { status: 'backlog' });
-        await setCurrentRecordingTask(null);
-        refreshTasks();
         console.error('Failed to start recording:', result.error);
-      } else {
-        // 更新录音状态
-        const status = await window.electron.getRecordingStatus();
-        setRecordingStatus(status);
       }
     } catch (error) {
       console.error('Error starting recording:', error);
-      refreshTasks();
     }
   };
 
   const handleStopRecording = async () => {
     try {
       const result = await window.electron.stopRecording();
-      console.log('Stop recording result:', result);
-      
-      // 重新获取最新的任务状态
-      await loadCurrentTask();
-      const currentTaskId = getCurrentRecordingTaskId();
-      
-      if (result.success && currentTaskId) {
-        // 如果停止成功，更新任务状态
-        await window.electron.updateTask(currentTaskId, { 
-          status: 'completed',
-          audioPath: result.path
-        });
-        await setCurrentRecordingTask(null);
-        const status = await window.electron.getRecordingStatus();
-        setRecordingStatus(status);
-        refreshTasks();
-      } else {
+      if (!result.success) {
         console.error('Failed to stop recording:', result.error);
       }
     } catch (error) {
@@ -110,38 +59,16 @@ const App: React.FC = () => {
   const handleCancelRecording = async () => {
     try {
       const result = await window.electron.cancelRecording();
-      
-      // 重新获取最新的任务状态
-      await loadCurrentTask();
-      const currentTaskId = getCurrentRecordingTaskId();
-      
-      if (currentTaskId) {
-        await window.electron.updateTask(currentTaskId, { status: 'backlog' });
-        await setCurrentRecordingTask(null);
-      }
       if (!result.success) {
         console.error('Failed to cancel recording:', result.error);
       }
-      refreshTasks();
     } catch (error) {
       console.error('Error canceling recording:', error);
     }
   };
 
-  const handleCreateMemoTask = async () => {
-    try {
-      const now = new Date().toISOString();
-      const title = `备忘录-${now}`;
-      const result = await window.electron.createTask(title, 'backlog');
-      console.log('Memo task created:', result);
-      refreshTasks();
-    } catch (error) {
-      console.error('Error creating memo task:', error);
-    }
-  };
-
   const getStatusText = () => {
-    if (recordingStatus.isRecording) {
+    if (currentTask) {
       return 'Recording...';
     }
     return 'Ready to record';
@@ -149,24 +76,18 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
+      <div className="main-panel">
       {/* Top Toolbar */}
+        <div className="panel-section toolbar-section">
       <header className="toolbar">
         <div className="recording-controls">
-          {!recordingStatus.isRecording ? (
-            <>
-              <button 
-                className="record-button"
-                onClick={handleStartRecording}
-              >
-                Start
-              </button>
-              <button 
-                className="memo-button"
-                onClick={handleCreateMemoTask}
-              >
-                Create
-              </button>
-            </>
+          {!currentTask ? (
+            <button 
+              className="record-button"
+              onClick={handleStartRecording}
+            >
+              Start
+            </button>
           ) : (
             <>
               <button 
@@ -198,18 +119,18 @@ const App: React.FC = () => {
             >
               API
             </button>
-          <button 
+            <button 
               className={`settings-button ${showSettings === 'test' ? 'active' : ''}`}
               onClick={() => setShowSettings(showSettings === 'test' ? null : 'test')}
-          >
+            >
               Test
-          </button>
+            </button>
           </div>
           <button 
             className="minimize-button"
             onClick={() => window.electron.minimizeToTray()}
           >
-            Minimize
+            Mini
           </button>
           <button 
             className="quit-button"
@@ -220,22 +141,19 @@ const App: React.FC = () => {
         </div>
         {/* <div className="status-indicator">{getStatusText()}</div> */}
       </header>
-
+        </div>
       {/* Task List */}
+        <div className="panel-section tasklist-section">
       <main className="task-list">
         <div className="task-list-header">
-          <h2>Recent Recordings</h2>
+          <h2>Recent</h2>
         </div>
         <div className="task-items">
           <TaskList />
         </div>
       </main>
-
-      {/* Status Bar */}
-      {/* <footer className="status-bar">
-        <div className="status-text">{getStatusText()}</div>
-      </footer> */}
-
+        </div>
+      </div>
       {/* Settings Modals */}
       {showSettings === 'shortcuts' && (
         <ShortcutSettings onClose={() => setShowSettings(null)} />

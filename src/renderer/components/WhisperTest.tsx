@@ -94,12 +94,13 @@ export const WhisperTest: React.FC<WhisperTestProps> = ({ onClose }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
+      <div className="modal-container">
         <div className="modal-header">
           <h2>Whisper API 测试</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body">
+        <div className="modal-content-wrapper">
+          <div className="modal-content">
           <div className="settings-section">
             <h3>健康检查</h3>
             <button 
@@ -115,7 +116,6 @@ export const WhisperTest: React.FC<WhisperTestProps> = ({ onClose }) => {
               </div>
             )}
           </div>
-
           <div className="settings-section">
             <h3>模型列表</h3>
             <button 
@@ -131,7 +131,6 @@ export const WhisperTest: React.FC<WhisperTestProps> = ({ onClose }) => {
               </div>
             )}
           </div>
-
           <div className="settings-section">
             <h3>连接测试</h3>
             <button 
@@ -147,7 +146,6 @@ export const WhisperTest: React.FC<WhisperTestProps> = ({ onClose }) => {
               </div>
             )}
           </div>
-
           <div className="settings-section">
             <h3>作业管理</h3>
             <button 
@@ -162,6 +160,7 @@ export const WhisperTest: React.FC<WhisperTestProps> = ({ onClose }) => {
                 {results.jobs.message}
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

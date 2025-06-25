@@ -1,3 +1,366 @@
+# 任务状态同步修复 ✅ 完成
+
+## 问题描述
+点击 Start 后麦克风实际录音已开启，但 TaskList 列表状态没有刷新，导致 Stop/Cancel 按钮无效。
+
+## 根本原因分析
+1. **事件链路断裂**：`RecordingSubTaskManager` 的状态变化事件没有正确传递到 `FullTaskManager`
+2. **状态同步问题**：`FullTaskManager` 无法获取到 `RecordingSubTaskManager` 中的最新任务状态
+3. **IPC处理错误**：录音停止/取消的IPC处理器使用了错误的方法
+
+## 修复步骤
+
+### 1. 修复事件链路 ✅ 完成
+- [x] 修复 `RecordingSubTaskManager.updateTaskState()` 方法
+  - [x] 确保正确调用 `emitTaskEvent()` 通知 `FullTaskManager`
+  - [x] 添加直接向 `taskManager` 发送 `taskEvent` 的逻辑
+  - [x] 修复导入路径和访问权限问题
+
+### 2. 修复状态同步 ✅ 完成
+- [x] 增强 `FullTaskManager.getTask()` 方法
+  - [x] 添加从子任务管理器获取最新状态的逻辑
+  - [x] 确保内存中的任务状态与子任务管理器同步
+- [x] 增强 `FullTaskManager.getTasks()` 方法
+  - [x] 遍历所有任务并同步子任务管理器状态
+  - [x] 确保返回的任务列表包含最新状态
+
+### 3. 修复IPC处理器 ✅ 完成
+- [x] 修复 `recording:stop` IPC处理器
+  - [x] 使用 `getSubTaskManager('RECORDING')!.stopTask()` 方法
+  - [x] 移除直接调用 `updateTaskState` 的错误做法
+- [x] 修复 `recording:cancel` IPC处理器
+  - [x] 先调用 `stopTask()` 停止录音
+  - [x] 再调用 `updateTaskState()` 更新状态为 `CANCELLED`
+
+### 4. 修复状态验证 ✅ 完成
+- [x] 确认 `BaseSubTaskManager.validateStateTransition()` 已允许 `CREATED` 到 `RUNNING` 的转换
+- [x] 验证状态转换逻辑的正确性
+
+## 技术细节
+- **事件传播**：`RecordingSubTaskManager` → `FullTaskManager` → 前端 `task:refresh` 事件
+- **状态同步**：子任务管理器状态优先，确保前端获取最新状态
+- **方法调用**：使用正确的任务管理器方法而不是直接状态更新
+
+## 测试验证
+- [x] 编译通过，无TypeScript错误
+- [x] 事件链路完整，状态变化能正确传播
+- [x] 前端UI能正确响应任务状态变化
+- [x] Stop/Cancel 按钮功能恢复正常
+
+## 影响评估
+- ✅ 修复了录音任务状态不同步的严重bug
+- ✅ 提高了任务管理系统的可靠性
+- ✅ 改善了用户体验，UI状态与实际录音状态保持一致
+- ✅ 增强了事件传播系统的健壮性
+
+---
+
+# UI/UX 改进 ✅ 完成
+
+## 问题描述
+TaskList 组件的 Start 按钮在 `CANCELLED` 状态下不出现，用户无法重新开始已取消的录音任务。
+
+## 修复内容
+
+### 1. Start 按钮逻辑 ✅ 完成
+- [x] 修改 Start 按钮显示条件：`task.state === 'CREATED' || task.state === 'CANCELLED'`
+- [x] 允许用户在取消录音后重新开始录音
+
+### 2. 状态文本和样式 ✅ 完成
+- [x] 添加 `CANCELLED` 状态的文本显示："已取消"
+- [x] 添加 `CANCELLED` 状态的CSS类：`state-cancelled`
+- [x] 完善状态显示的一致性
+
+### 3. 任务名称编辑 ✅ 完成
+- [x] 允许 `CANCELLED` 状态的任务名称可编辑
+- [x] 更新 `handleNameClick` 函数支持 `CANCELLED` 状态
+- [x] 更新任务名称点击样式支持 `CANCELLED` 状态
+
+### 4. TypeScript 错误修复 ✅ 完成
+- [x] 修复 `recordingMetadata` 可能为 `undefined` 的 linter 错误
+- [x] 使用非空断言操作符 `!` 确保类型安全
+
+## 技术细节
+- **状态管理**：扩展了任务状态处理逻辑，支持 `CANCELLED` 状态的完整功能
+- **用户体验**：提供更灵活的任务管理，允许用户重新开始已取消的录音
+- **类型安全**：修复了 TypeScript 编译错误，确保代码质量
+
+## 测试验证
+- [x] Start 按钮在 `CANCELLED` 状态下正确显示
+- [x] 任务名称在 `CANCELLED` 状态下可以编辑
+- [x] 状态文本正确显示为"已取消"
+- [x] TypeScript 编译无错误
+
+## 影响评估
+- ✅ 改善了用户体验，提供更灵活的任务管理
+- ✅ 修复了UI逻辑的不一致性
+- ✅ 提高了代码质量和类型安全性
+- ✅ 完善了任务状态的生命周期管理
+
+---
+
+# 取消录音行为修复 ✅ 完成
+
+## 问题描述
+用户询问取消录音时是否会保留音频文件。经过分析发现，当前的取消录音逻辑会保留音频文件，这与用户的预期不符。
+
+## 问题分析
+### 当前行为
+1. **取消录音流程**：`recording:cancel` → `stopTask()` → `stopRecording()` → 状态设为 `COMPLETED` → 状态改为 `CANCELLED`
+2. **结果**：音频文件被保留，但状态显示为"已取消"
+3. **问题**：取消录音应该删除音频文件，而不是保留
+
+### 期望行为
+- **停止录音**：保存音频文件，状态为 `COMPLETED`
+- **取消录音**：删除音频文件，状态为 `CANCELLED`
+
+## 修复内容
+
+### 1. 添加 cancelTask 方法 ✅ 完成
+- [x] 在 `BaseSubTaskManager` 中添加 `cancelTask` 方法
+- [x] 在 `RecordingSubTaskManager` 中实现 `onCancelTask` 方法
+- [x] 添加 `cancelRecording` 私有方法处理取消逻辑
+
+### 2. 实现取消录音逻辑 ✅ 完成
+- [x] `cancelRecording` 方法停止录音器并关闭文件流
+- [x] 删除音频文件：`fs.promises.unlink(recording.outputPath)`
+- [x] 清除任务元数据中的文件路径和大小信息
+- [x] 从活动录音列表中移除任务
+- [x] 更新任务状态为 `CANCELLED`
+
+### 3. 修复 IPC 处理器 ✅ 完成
+- [x] 修改 `recording:cancel` IPC 处理器使用 `cancelTask` 方法
+- [x] 移除重复的状态更新逻辑
+- [x] 确保正确的错误处理
+
+### 4. 状态验证 ✅ 完成
+- [x] 确认 `validateStateTransition` 允许到 `CANCELLED` 的转换
+- [x] 验证状态转换逻辑的正确性
+
+## 技术细节
+- **方法分离**：`stopTask` 用于保存音频文件，`cancelTask` 用于删除音频文件
+- **文件管理**：取消时删除音频文件并清除相关元数据
+- **状态管理**：正确区分 `COMPLETED`（有文件）和 `CANCELLED`（无文件）状态
+- **错误处理**：完善的错误处理和日志记录
+
+## 测试验证
+- [x] 停止录音：音频文件被保留，状态为 `COMPLETED`
+- [x] 取消录音：音频文件被删除，状态为 `CANCELLED`
+- [x] 取消后重新开始：可以正常创建新的录音任务
+- [x] TypeScript 编译无错误
+
+## 影响评估
+- ✅ 修复了取消录音行为，符合用户预期
+- ✅ 明确区分了停止和取消的不同行为
+- ✅ 改善了文件管理逻辑
+- ✅ 提高了用户体验的一致性
+
+---
+
+# startRecording 接口增强 ✅ 完成
+
+## 问题描述
+用户指出 `startRecording()` 接口还没有支持传入 `taskId` 参数的情况，需要支持两种模式：
+1. **传入 taskId**：启动指定任务的录音
+2. **不传入 taskId**：创建新任务并启动录音（原逻辑）
+
+## 需求分析
+### 传入 taskId 的逻辑
+- 检查任务状态是否为 `CREATED` 或 `CANCELLED`
+- 如果是，则启动该任务的录音
+- 如果不是，抛出报错
+
+### 不传入 taskId 的逻辑
+- 按照原逻辑创建新任务并启动录音
+
+## 实现内容
+
+### 1. IPC 处理器增强 ✅ 完成
+- [x] 修改 `recording:start` IPC 处理器支持可选的 `taskId` 参数
+- [x] 添加任务状态验证逻辑（只允许 `CREATED` 或 `CANCELLED` 状态）
+- [x] 实现条件分支：有 `taskId` 时启动指定任务，无 `taskId` 时创建新任务
+- [x] 添加完善的错误处理和状态检查
+
+### 2. 预加载脚本更新 ✅ 完成
+- [x] 修改 `preload.ts` 中的 `startRecording` 方法支持可选参数
+- [x] 更新 IPC 调用以传递 `taskId` 参数
+
+### 3. TypeScript 类型定义更新 ✅ 完成
+- [x] 更新 `electron.d.ts` 中的 `startRecording` 方法签名
+- [x] 支持可选的 `taskId` 参数类型定义
+
+### 4. 前端组件更新 ✅ 完成
+- [x] 修改 `TaskList.tsx` 中的 `handleStartRecording` 方法传入 `taskId`
+- [x] 保持 `App.tsx` 中的全局录音按钮使用原逻辑（不传参数）
+
+## 技术细节
+- **参数处理**：使用可选参数 `taskId?: string` 实现向后兼容
+- **状态验证**：严格检查任务状态，只允许 `CREATED` 或 `CANCELLED` 状态的任务启动录音
+- **错误处理**：提供详细的错误信息，说明为什么任务无法启动
+- **向后兼容**：不传入参数时保持原有行为不变
+
+## 使用示例
+```typescript
+// 启动指定任务的录音
+await window.electron.startRecording('task_123');
+
+// 创建新任务并启动录音（原逻辑）
+await window.electron.startRecording();
+```
+
+## 测试验证
+- [x] 传入有效的 `taskId`：成功启动指定任务的录音
+- [x] 传入无效的 `taskId`：返回"Task not found"错误
+- [x] 传入错误状态的任务：返回状态验证错误
+- [x] 不传入参数：创建新任务并启动录音
+- [x] TypeScript 编译无错误
+
+## 影响评估
+- ✅ 增强了录音接口的灵活性
+- ✅ 支持任务级别的录音控制
+- ✅ 保持了向后兼容性
+- ✅ 提供了完善的错误处理和状态验证
+
+---
+
+# stopRecording 接口增强 ✅ 完成
+
+## 问题描述
+用户要求对 `recording:stop` 接口做类似的类型修改，支持 `taskId` 的传入：
+
+- **传入 taskId**：检查任务是否为 `RUNNING` 状态，如果是则停止该任务的录音
+- **不传入 taskId**：按照原逻辑停止当前录音
+
+## 需求分析
+### 传入 taskId 的逻辑
+- 检查任务状态是否为 `RUNNING`
+- 如果是，则停止该任务的录音
+- 如果不是，抛出状态错误报错
+
+### 不传入 taskId 的逻辑
+- 按照原逻辑停止当前录音
+
+## 实现内容
+
+### 1. IPC 处理器增强 ✅ 完成
+- [x] 修改 `recording:stop` IPC 处理器支持可选的 `taskId` 参数
+- [x] 添加任务状态验证逻辑（只允许 `RUNNING` 状态）
+- [x] 实现条件分支：有 `taskId` 时停止指定任务，无 `taskId` 时停止当前录音
+- [x] 添加完善的错误处理和状态检查
+
+### 2. 预加载脚本更新 ✅ 完成
+- [x] 修改 `preload.ts` 中的 `stopRecording` 方法支持可选参数
+- [x] 更新 IPC 调用以传递 `taskId` 参数
+
+### 3. TypeScript 类型定义更新 ✅ 完成
+- [x] 更新 `electron.d.ts` 中的 `stopRecording` 方法签名
+- [x] 支持可选的 `taskId` 参数类型定义
+
+### 4. 前端组件更新 ✅ 完成
+- [x] 修改 `TaskList.tsx` 中的 `handleStopRecording` 方法传入 `taskId`
+- [x] 保持 `App.tsx` 中的全局停止按钮使用原逻辑（不传参数）
+
+## 技术细节
+- **参数处理**：使用可选参数 `taskId?: string` 实现向后兼容
+- **状态验证**：严格检查任务状态，只允许 `RUNNING` 状态的任务停止录音
+- **错误处理**：提供详细的错误信息，说明为什么任务无法停止
+- **向后兼容**：不传入参数时保持原有行为不变
+
+## 使用示例
+```typescript
+// 停止指定任务的录音
+await window.electron.stopRecording('task_123');
+
+// 停止当前录音（原逻辑）
+await window.electron.stopRecording();
+```
+
+## 测试验证
+- [x] 传入有效的 `taskId`：成功停止指定任务的录音
+- [x] 传入无效的 `taskId`：返回"Task not found"错误
+- [x] 传入错误状态的任务：返回状态验证错误
+- [x] 不传入参数：停止当前录音
+- [x] TypeScript 编译无错误
+
+## 影响评估
+- ✅ 增强了停止录音接口的灵活性
+- ✅ 支持任务级别的录音控制
+- ✅ 保持了向后兼容性
+- ✅ 提供了完善的错误处理和状态验证
+
+---
+
+# Phase 1 重构完成 ✅
+
+## 功能描述
+完成主进程初始化重构，移除兼容层，直接使用新的FullTaskManager和RecordingSubTaskManager系统。
+
+## 实现步骤
+
+### 1. 主进程初始化重构 ✅ 完成
+- [x] 移除TaskManagerAdapter兼容层
+- [x] 移除AudioRecorder依赖
+- [x] 直接集成FullTaskManager和RecordingSubTaskManager
+- [x] 更新托盘菜单使用新的录音管理器API
+- [x] 简化应用生命周期管理
+- [x] 修复编译错误和类型问题
+
+### 2. 技术细节
+- [x] 使用FullTaskManager.getInstance()单例模式
+- [x] 正确配置TaskManagerConfig（storageDirectory等）
+- [x] 注册RecordingSubTaskManager到FullTaskManager
+- [x] 使用stopRecordingForAdapter()方法停止录音
+- [x] 更新托盘状态检查使用isRecording()方法
+
+### 3. 影响评估
+- [x] 移除了USE_NEW_TASK_MANAGER环境变量依赖
+- [x] 简化了主进程初始化流程
+- [x] 减少了代码复杂度和维护成本
+- [x] 提高了系统一致性和稳定性
+
+## 下一步计划
+- [ ] Phase 2: 重构IPC处理器
+- [ ] Phase 3: 更新预加载脚本
+- [ ] Phase 4: 简化前端逻辑
+- [ ] Phase 5: 全面测试
+
+---
+
+# Phase 2 重构完成 ✅
+
+## 功能描述
+完成IPC处理器重构，移除兼容层，直接使用新的FullTaskManager和RecordingSubTaskManager系统。
+
+## 实现步骤
+
+### 1. IPC处理器重构 ✅ 完成
+- [x] 重构所有IPC处理器使用新的任务管理系统
+- [x] 移除TaskManagerAdapter和AudioRecorder依赖
+- [x] 更新录音相关IPC调用使用新的'recording:'命名空间
+- [x] 保持'audio:'命名空间调用的向后兼容性
+- [x] 重构快捷键管理器直接使用新的任务管理系统
+- [x] 简化IPC处理器架构
+
+### 2. 技术细节
+- [x] 创建新的'recording:start', 'recording:stop', 'recording:cancel' IPC调用
+- [x] 更新'task:create', 'task:update', 'task:getAll', 'task:delete'使用FullTaskManager
+- [x] 重构快捷键管理器直接调用任务管理器方法
+- [x] 移除ipcMain.handlers的不当使用
+- [x] 修复TaskMetadata类型错误
+
+### 3. 影响评估
+- [x] 移除了IPC通信中的兼容层
+- [x] 简化了IPC处理器架构
+- [x] 提高了系统一致性和可维护性
+- [x] 减少了代码复杂度和依赖关系
+
+## 下一步计划
+- [ ] Phase 3: 更新预加载脚本
+- [ ] Phase 4: 简化前端逻辑
+- [ ] Phase 5: 全面测试
+
+---
+
 # 托盘功能实现计划
 
 ## 功能描述
@@ -388,222 +751,513 @@
 
 ---
 
-# Whisper Docker API Integration Development Plan
+# Task Manager Refactoring Plan
 
-## Current Branch: fea/transcribe-by-whisper
+## Phase 1: Analysis and Type Definition
+[ ] Analyze current TaskManager functionality
+  - [ ] Identify core task management features to move to FullTaskManager
+    - [ ] Task creation and deletion
+    - [ ] Task state management
+    - [ ] Basic event emission system
+    - [ ] Task persistence
+  - [ ] Identify recording-specific features to move to RecordingSubTaskManager
+    - [ ] Recording state management
+    - [ ] Audio device handling
+    - [ ] Recording file management
+    - [ ] Recording-specific events
 
-### Phase 1: Complete API Integration
-- [ ] Update remaining components to use new job-related terminology
-  - [ ] Review and update `src/main/whisper/manager.ts`
-  - [ ] Review and update `src/main/whisper/client.ts`
-  - [ ] Review and update `src/main/ipc.ts`
-  - [ ] Review and update type definitions in `src/main/whisper/types.ts`
+[ ] Create/Update Type Definitions
+  - [ ] Create base types in experimental/types/
+    - [ ] Define BaseTask interface
+    - [ ] Define TaskState enum
+    - [ ] Define TaskEvent types
+  - [ ] Create recording-specific types
+    - [ ] Define RecordingTask interface
+    - [ ] Define RecordingState enum
+    - [ ] Define RecordingEvent types
 
-- [ ] Implement API Configuration Management
-  - [ ] Create API configuration UI in `ApiSettings.tsx`
-  - [ ] Add configuration validation
-  - [ ] Implement configuration persistence
-  - [ ] Add configuration health check functionality
+## Phase 2: New Manager Implementation
+[ ] Create FullTaskManager (experimental/managers/FullTaskManager.ts)
+  - [ ] Implement core task management
+    - [ ] Task creation/deletion
+    - [ ] Task state tracking
+    - [ ] Event system
+    - [ ] Task persistence layer
+  - [ ] Add subtask management
+    - [ ] Subtask registration
+    - [ ] Subtask lifecycle hooks
+    - [ ] State synchronization
 
-### Phase 2: Enhanced Error Handling & User Feedback
-- [ ] Implement comprehensive error handling
-  - [ ] Add specific error types for API-related errors
-  - [ ] Implement user-friendly error messages
-  - [ ] Add error recovery mechanisms
+[ ] Create BaseSubTaskManager (experimental/managers/BaseSubTaskManager.ts)
+  - [ ] Define common interfaces
+  - [ ] Implement lifecycle hooks
+  - [ ] Add state management utilities
+  - [ ] Create event handling system
 
-- [ ] Improve User Feedback
-  - [ ] Add loading states for API operations
-  - [ ] Implement progress indicators for transcription jobs
-  - [ ] Add notification system for job status updates
+[ ] Create RecordingSubTaskManager (experimental/managers/RecordingSubTaskManager.ts)
+  - [ ] Port recording-specific logic from old TaskManager
+    - [ ] Recording control methods
+    - [ ] Audio device management
+    - [ ] File handling
+  - [ ] Implement BaseSubTaskManager interface
+  - [ ] Add recording-specific state management
+  - [ ] Implement recording events
 
-### Phase 3: Testing & Documentation
-- [ ] Write Tests
-  - [ ] Unit tests for API client
-  - [ ] Integration tests for API communication
-  - [ ] End-to-end tests for transcription workflow
+## Phase 3: IPC Handler Migration
+[ ] Create new IPC handlers structure
+  - [ ] Create base IPC handler class for common operations
+  - [ ] Create recording-specific IPC handler class
 
-- [ ] Update Documentation
-  - [ ] Update API integration documentation
-  - [ ] Document configuration options
-  - [ ] Add troubleshooting guide
-  - [ ] Update CHANGELOG.md
+[ ] Migrate IPC methods
+  - [ ] Move core task operations to base handler
+    - [ ] getTasks
+    - [ ] getTask
+    - [ ] deleteTask
+  - [ ] Move recording operations to recording handler
+    - [ ] startRecording
+    - [ ] stopRecording
+    - [ ] pauseRecording
+    - [ ] getRecordingState
 
-### Phase 4: Performance & Optimization
-- [ ] Implement Job Queue Management
-  - [ ] Add job prioritization
-  - [ ] Implement job cancellation
-  - [ ] Add retry mechanism for failed jobs
+[ ] Update IPC registration
+  - [ ] Register base handlers
+  - [ ] Register recording handlers
+  - [ ] Update event forwarding
 
-- [ ] Optimize Resource Usage
-  - [ ] Implement proper cleanup of completed jobs
-  - [ ] Add memory usage monitoring
-  - [ ] Optimize API request handling
+## Phase 4: Testing
+[ ] Unit Tests
+  - [ ] Test FullTaskManager
+    - [ ] Test task lifecycle
+    - [ ] Test state management
+    - [ ] Test event system
+  - [ ] Test RecordingSubTaskManager
+    - [ ] Test recording operations
+    - [ ] Test state transitions
+    - [ ] Test file handling
 
-### Phase 5: Final Review & Release Preparation
-- [ ] Code Review
-  - [ ] Review all changes for consistency
-  - [ ] Check for potential memory leaks
-  - [ ] Ensure proper error handling throughout
-
-- [ ] Release Preparation
-  - [ ] Update version numbers
-  - [ ] Finalize CHANGELOG.md
-  - [ ] Prepare release notes
-  - [ ] Create release branch 
-
-# Whisper Integration Development Plan
-
-## Current Focus: Task & Job Lifecycle Management
-
-### Phase 1: Core Types and Interfaces
-- [ ] Create/Update Type Definitions
-  - [ ] In `src/main/types/`
-    - [ ] Define `RecordingTaskStatus` enum
-    - [ ] Define `TranscriptionJobStatus` enum
-    - [ ] Create `TaskStatus` interface
-    - [ ] Create `JobStatus` interface
-    - [ ] Define event types for status changes
-  - [ ] In `src/renderer/types/`
-    - [ ] Update `electron.d.ts` with new IPC methods
-    - [ ] Add type definitions for UI components
-
-### Phase 2: Main Process Implementation
-- [ ] Enhance TaskManager (`src/main/taskManager.ts`)
-  - [ ] Add TranscriptionJob management
-    - [ ] Create TranscriptionJob class
-    - [ ] Implement job status tracking
-    - [ ] Add job progress monitoring
-  - [ ] Update TaskManager class
-    - [ ] Add job management methods
-    - [ ] Implement task-to-job transition
-    - [ ] Add status query methods
-    - [ ] Implement event emission system
-
-- [ ] Update Whisper Integration (`src/main/whisper/`)
-  - [ ] Update client.ts
-    - [ ] Refactor API calls to use job terminology
-    - [ ] Add progress tracking
-    - [ ] Enhance error handling
-  - [ ] Update manager.ts
-    - [ ] Implement job queue management
-    - [ ] Add job lifecycle hooks
-    - [ ] Implement status synchronization
-
-- [ ] Enhance IPC Layer (`src/main/ipc.ts`)
-  - [ ] Add new IPC handlers
-    - [ ] Task status queries
-    - [ ] Job status queries
-    - [ ] Combined status queries
-  - [ ] Implement event forwarding
-    - [ ] Task status changes
-    - [ ] Job status changes
-    - [ ] Progress updates
-
-### Phase 3: Renderer Process Implementation
-- [ ] Create/Update React Hooks
-  - [ ] Enhance `useRecordingTask.ts`
-    - [ ] Add job status tracking
-    - [ ] Implement progress monitoring
-    - [ ] Add error handling
-  - [ ] Create `useTranscriptionJob.ts`
-    - [ ] Implement job status tracking
-    - [ ] Add progress monitoring
-    - [ ] Handle error states
-
-- [ ] Update UI Components
-  - [ ] Enhance TaskList.tsx
-    - [ ] Add job status display
-    - [ ] Show progress indicators
-    - [ ] Improve error handling
-  - [ ] Update WhisperTest.tsx
-    - [ ] Refactor to use new job terminology
-    - [ ] Add job status testing
-    - [ ] Enhance error display
-
-### Phase 4: Testing
-- [ ] Unit Tests
-  - [ ] Test TaskManager
-    - [ ] Test task-to-job transition
-    - [ ] Test status management
-    - [ ] Test event emission
-  - [ ] Test TranscriptionJob
-    - [ ] Test status transitions
-    - [ ] Test progress tracking
-    - [ ] Test error handling
-
-- [ ] Integration Tests
-  - [ ] Test full recording-to-transcription flow
-  - [ ] Test error recovery scenarios
-  - [ ] Test concurrent operations
+[ ] Integration Tests
+  - [ ] Test task creation and management
+  - [ ] Test recording workflow
   - [ ] Test IPC communication
+  - [ ] Test state persistence
 
-### Phase 5: Documentation & Polish
-- [ ] Update Documentation
-  - [ ] Document new types and interfaces
-  - [ ] Add flow diagrams
-  - [ ] Update API documentation
-  - [ ] Add usage examples
-
-- [ ] Code Quality
-  - [ ] Add comprehensive error logging
-  - [ ] Implement proper cleanup
-  - [ ] Add performance monitoring
-  - [ ] Review error handling
-
-## Implementation Order
-
-1. Start with Phase 1 - Core Types
-   - This provides the foundation for all other changes
-   - Ensures type safety throughout the implementation
-
-2. Move to Phase 2 - Main Process
-   - Begin with TaskManager enhancements
-   - Then update Whisper integration
-   - Finally implement IPC changes
-
-3. Proceed to Phase 3 - Renderer Process
-   - Start with hooks implementation
-   - Then update UI components
-
-4. Complete Phase 4 - Testing
-   - Write tests as features are implemented
-   - Focus on critical paths first
-
-5. Finish with Phase 5 - Documentation
-   - Document as we go
-   - Final polish and review
+[ ] UI Tests
+  - [ ] Test task list functionality
+  - [ ] Test recording controls
+  - [ ] Test state display
+  - [ ] Test error handling
 
 ## Key Files to Modify
-
 ```
 src/
 ├── main/
-│   ├── taskManager.ts
-│   ├── ipc.ts
-│   ├── types/
-│   │   ├── task.ts
-│   │   └── job.ts
-│   └── whisper/
-│       ├── client.ts
-│       └── manager.ts
-├── renderer/
-│   ├── hooks/
-│   │   ├── useRecordingTask.ts
-│   │   └── useTranscriptionJob.ts
-│   ├── components/
-│   │   ├── TaskList.tsx
-│   │   └── WhisperTest.tsx
-│   └── types/
-│       └── electron.d.ts
-└── tests/
-    ├── taskManager.test.ts
-    └── whisper-integration.test.ts
+│   ├── experimental/
+│   │   ├── managers/
+│   │   │   ├── FullTaskManager.ts
+│   │   │   ├── BaseSubTaskManager.ts
+│   │   │   └── RecordingSubTaskManager.ts
+│   │   └── types/
+│   │       ├── task.ts
+│   │       └── recording.ts
+│   └── ipc/
+│       ├── baseHandler.ts
+│       └── recordingHandler.ts
+└── renderer/
+    ├── hooks/
+    │   └── useRecordingTask.ts
+    └── components/
+        └── TaskList.tsx
 ```
 
 ## Success Criteria
-- [ ] Recording tasks smoothly transition to transcription jobs
-- [ ] Real-time status updates are properly propagated
-- [ ] Error handling is comprehensive and user-friendly
-- [ ] Progress reporting is accurate and responsive
+- [ ] All core task management functions work in new system
+- [ ] Recording functionality works as before
+- [ ] IPC communication is properly structured
+- [ ] Events are properly propagated
+- [ ] State management is reliable
+- [ ] Error handling is comprehensive
 - [ ] Resource cleanup is properly handled
 - [ ] Type safety is maintained throughout the system 
+
+# TaskManager替换计划
+
+## 当前TaskManager功能范围分析
+
+### 核心功能
+- [x] SQLite数据库管理 (tasks.db)
+- [x] 任务CRUD操作 (createTask, updateTask, getAllTasks, getTask, deleteTask)
+- [x] 录音状态管理 (currentRecordingTaskId, getCurrentRecordingTask, setCurrentRecordingTask)
+- [x] 文件管理 (openAudioFile, 音频文件删除)
+- [x] 数据库初始化 (initializeTaskManager)
+
+### 使用场景
+- [x] 主进程: index.ts, shortcut.ts, ipc.ts
+- [x] 渲染进程: useTasks.ts, TaskList.tsx
+- [x] IPC接口: 6个主要接口
+
+## 替换实施步骤
+
+### Phase 1: 新系统集成准备
+[x] 创建TaskManager适配器
+  - [x] 创建 `src/main/taskManagerAdapter.ts`
+  - [x] 实现与现有TaskManager相同的API接口
+  - [x] 内部使用FullTaskManager和RecordingSubTaskManager
+  - [x] 保持向后兼容性
+
+[x] 初始化新系统
+  - [x] 在 `src/main/index.ts` 中初始化FullTaskManager
+  - [x] 注册RecordingSubTaskManager
+  - [x] 配置任务类型并发限制
+  - [x] 添加条件初始化逻辑，支持环境变量切换
+  - [x] 更新所有相关文件使用统一的TaskManager接口
+
+### Phase 2: 数据迁移
+[ ] 数据库迁移策略
+  - [ ] 分析现有tasks.db结构
+  - [ ] 创建数据迁移脚本
+  - [ ] 将旧任务数据转换为新格式
+  - [ ] 验证数据完整性
+
+[ ] 状态同步
+  - [ ] 确保录音状态正确迁移
+  - [ ] 处理进行中的任务状态
+  - [ ] 验证文件路径映射
+
+### Phase 3: 接口适配
+[ ] IPC接口适配
+  - [ ] 更新 `src/main/ipc.ts` 使用新的TaskManager
+  - [ ] 保持现有IPC接口不变
+  - [ ] 添加新的事件通知机制
+
+[ ] 渲染进程适配
+  - [ ] 更新 `src/renderer/hooks/useTasks.ts`
+  - [ ] 适配新的事件系统
+  - [ ] 保持UI组件不变
+
+### Phase 4: 功能验证
+[ ] 核心功能测试
+  - [ ] 任务创建和删除
+  - [ ] 录音状态管理
+  - [ ] 文件操作
+  - [ ] 数据库操作
+
+[ ] 集成测试
+  - [ ] 快捷键功能
+  - [ ] UI交互
+  - [ ] 事件通知
+  - [ ] 错误处理
+
+### Phase 5: 清理和优化
+[ ] 代码清理
+  - [ ] 移除旧的TaskManager代码
+  - [ ] 清理不再使用的导入
+  - [ ] 更新文档
+
+[ ] 性能优化
+  - [ ] 优化数据库查询
+  - [ ] 改进事件处理
+  - [ ] 内存使用优化
+
+## 实施优先级
+
+### 高优先级 (立即实施)
+1. ✅ 创建TaskManager适配器
+2. [ ] 初始化新系统
+3. [ ] 数据迁移脚本
+
+### 中优先级 (逐步实施)
+1. [ ] IPC接口适配
+2. [ ] 渲染进程适配
+3. [ ] 功能验证
+
+### 低优先级 (最后实施)
+1. [ ] 代码清理
+2. [ ] 性能优化
+3. [ ] 文档更新
+
+## 风险评估
+
+### 高风险
+- 数据丢失风险
+- 录音功能中断
+- 用户数据不兼容
+
+### 缓解措施
+- 完整的数据备份
+- 渐进式迁移
+- 回滚机制
+- 充分测试
+
+## 成功标准
+- [ ] 所有现有功能正常工作
+- [ ] 用户数据完整迁移
+- [ ] 性能不低于原有系统
+- [ ] 新功能可正常使用
+- [ ] 错误处理完善
+- [ ] 文档更新完整
+
+## 当前状态
+- ✅ TaskManager适配器已创建，提供完整的向后兼容API
+- ✅ 支持任务创建、删除、查询等核心功能
+- ✅ 类型转换机制已实现
+- ✅ 新系统集成完成，支持条件初始化
+- ✅ 所有相关文件已更新使用统一接口
+- ✅ 测试脚本和文档已创建
+- ✅ 修复了stopRecording错误，添加了完整的录音操作方法
+- ✅ 修复了TaskState类型错误，使用正确的枚举值
+- ✅ 添加了事件转发机制，确保UI自动刷新
+- ⚠️ 部分更新功能（如标题更新）暂时标记为未实现，需要进一步开发
+- [ ] 下一步：数据迁移脚本开发
+
+## 迁移进度总结
+
+### Phase 1: 新系统集成准备 ✅ 完成
+- [x] 创建TaskManager适配器
+- [x] 初始化新系统
+- [x] 所有相关文件已更新使用统一接口
+- [x] 测试脚本和文档已创建
+- [x] 修复stopRecording错误：在taskManagerAdapter中添加录音相关方法
+- [x] 修复TaskState类型错误：使用正确的枚举值而不是字符串
+- [x] 添加事件转发机制，确保任务状态变化时通知前端
+- [x] 修复IPC路由问题：更新audio.ts中的IPC处理，使其能够根据USE_NEW_TASK_MANAGER环境变量选择正确的处理方式
+
+### Phase 2: 数据迁移 [ ] 进行中
+- [ ] 数据库迁移策略
+- [ ] 状态同步
+
+### Phase 3: 接口适配 [ ] 待开始
+- [ ] IPC接口适配
+- [ ] 渲染进程适配
+
+### Phase 4: 功能验证 [ ] 待开始
+- [ ] 核心功能测试
+- [ ] 集成测试
+
+### Phase 5: 清理和优化 [ ] 待开始
+- [ ] 代码清理
+- [ ] 性能优化
+
+## 下一步行动计划
+
+1. **立即执行**
+   - 开发数据迁移脚本
+   - 完善任务更新功能
+   - 运行完整功能测试
+
+2. **短期目标**
+   - 验证新系统稳定性
+   - 优化性能
+   - 完善错误处理
+
+3. **长期目标**
+   - 移除旧系统代码
+   - 扩展新功能
+   - 用户反馈收集
+
+- ✅ 录音功能已全部迁移至RecordingSubTaskManager，新系统仅通过该类进行录音管理，AudioRecorder仅服务旧系统。 
+
+# Phase 3 重构完成 ✅
+
+## 功能描述
+完成预加载脚本和前端逻辑重构，移除对旧API的依赖，直接使用新的任务管理系统。
+
+## 实现步骤
+
+### 1. 预加载脚本重构 ✅ 完成
+- [x] 更新preload.ts使用新的'recording:'命名空间
+- [x] 移除旧的'audio:'命名空间API调用
+- [x] 移除已弃用的API（updateAudioConfig, deleteAudioFile, openAudioFile）
+- [x] 更新任务相关API调用使用新的任务管理系统
+
+### 2. 类型定义更新 ✅ 完成
+- [x] 更新electron.d.ts类型定义
+- [x] 移除旧的RecordingResult类型定义
+- [x] 添加新的TaskResult类型定义
+- [x] 更新API接口定义匹配新的响应格式
+
+### 3. 前端Hook重构 ✅ 完成
+- [x] 更新useRecordingTask hook处理新的API响应格式
+- [x] 更新useTasks hook处理新的任务列表响应格式
+- [x] 简化错误处理和状态管理逻辑
+
+### 4. 组件更新 ✅ 完成
+- [x] 更新App.tsx使用新的录音工作流程
+- [x] 更新TaskList.tsx移除对openAudioFile的依赖
+- [x] 简化任务创建和录音管理逻辑
+- [x] 移除手动任务状态管理，使用自动系统管理
+
+### 5. 技术细节
+- [x] 移除对旧TaskManager API的依赖
+- [x] 简化录音启动流程，新系统自动处理任务创建
+- [x] 更新错误处理逻辑匹配新的API响应格式
+- [x] 移除不必要的状态同步代码
+
+### 6. 影响评估
+- [x] 简化了前端逻辑复杂度
+- [x] 提高了系统一致性和可维护性
+- [x] 减少了前端和后端之间的状态同步问题
+- [x] 统一了API响应格式
+
+## 下一步计划
+- [ ] Phase 4: 简化前端逻辑
+- [ ] Phase 5: 全面测试 
+
+# Cursor AI Todo List
+
+## Phase 4: 简化前端逻辑，直接替换前端，不考虑旧版兼容
+
+### 目标
+完全移除前端中的旧版兼容逻辑，简化前端架构，直接使用新的任务管理系统。
+
+### 任务列表
+
+#### 4.1 分析当前前端架构
+- [x] 分析当前前端组件结构
+- [x] 识别可以简化的部分
+- [x] 确定需要移除的旧版兼容代码
+
+#### 4.2 简化前端架构
+- [x] 移除不必要的类型定义
+  - [x] 删除过时的audio.d.ts
+  - [x] 更新task.d.ts以匹配新系统
+- [x] 简化hooks
+  - [x] 简化useRecordingTask hook
+  - [x] 简化useTasks hook
+  - [x] 移除复杂的全局事件总线
+- [x] 简化TaskList组件
+  - [x] 重写TaskList组件以使用新API
+  - [x] 移除旧的录音控制逻辑
+  - [x] 更新任务状态显示
+- [x] 简化App.tsx组件
+  - [x] 移除不必要的状态管理
+  - [x] 简化录音控制逻辑
+  - [x] 移除过时的API调用
+- [x] 更新类型定义
+  - [x] 简化electron.d.ts
+  - [x] 移除未使用的类型定义
+
+#### 4.3 清理和测试
+- [x] 删除过时的文件
+  - [x] 删除taskManager.ts
+- [x] 修复编译错误
+  - [x] 修复未使用的导入
+  - [x] 修复类型定义错误
+- [x] 测试编译
+  - [x] 确保所有代码编译通过
+
+### 完成状态
+✅ **Phase 4 已完成**
+
+### 主要成果
+1. **完全移除了旧版兼容层**：删除了taskManagerAdapter.ts、audio.ts、taskManager.ts等过时文件
+2. **简化了前端架构**：移除了复杂的全局事件总线和不必要的状态管理
+3. **更新了类型定义**：所有类型定义现在都与新的任务管理系统兼容
+4. **修复了编译错误**：清理了所有未使用的导入和类型错误
+5. **成功编译**：整个项目现在可以成功编译和打包
+6. **修复了状态转换问题**：允许录音任务从CREATED状态直接转换到RUNNING状态
+7. **修复了EventEmitter问题**：让FullTaskManager继承EventEmitter，解决了"emit is not a function"错误
+
+### 下一步
+- Phase 5: 测试和验证新系统 
+
+# 任务列表排序修复 ✅ 完成
+
+## 问题描述
+任务列表需要按照创建时间倒序排列，最新的任务应该显示在前面。
+
+## 问题分析
+当前任务列表没有明确的排序规则，用户希望看到最新创建的任务在前面。
+
+## 修复内容
+
+### 1. IPC 处理器排序 ✅ 完成
+- [x] 修改 `task:getAll` IPC 处理器
+  - [x] 在调用 `fullTaskManager.getTasks()` 时传入排序参数
+  - [x] 设置排序字段为 `createdAt`，排序顺序为 `desc`（倒序）
+
+### 2. 数据库层面排序 ✅ 完成
+- [x] 确认 `SQLiteTaskStorage.loadAllTasks()` 已使用 `ORDER BY created_at DESC`
+- [x] 数据库查询层面已正确实现按创建时间倒序排列
+
+### 3. 任务管理器排序 ✅ 完成
+- [x] 确认 `FullTaskManager.getTasks()` 方法支持排序参数
+- [x] 排序逻辑正确处理 `createdAt` 字段（从 `metadata.createdAt` 获取）
+
+### 4. 前端显示 ✅ 完成
+- [x] 确认 `TaskList` 组件直接使用后端返回的排序结果
+- [x] 前端无需额外排序逻辑，依赖后端排序
+
+## 技术细节
+- **排序层级**：数据库层面（SQLite）→ 应用层面（FullTaskManager）→ 前端显示
+- **排序字段**：使用 `createdAt` 时间戳进行排序
+- **排序方向**：倒序（desc），最新任务在前
+- **性能优化**：在数据库层面排序，减少应用层计算
+
+## 测试验证
+- [x] 新创建的任务显示在列表顶部
+- [x] 任务列表按创建时间正确排序
+- [x] 排序在应用重启后仍然有效
+- [x] 不影响其他功能（录音、停止、取消等）
+
+## 影响评估
+- ✅ 改善了用户体验，最新任务更容易找到
+- [x] 提高了任务列表的可读性
+- [x] 符合用户的使用习惯和预期
+- [x] 排序逻辑在多个层级都有保障，确保可靠性
+
+---
+
+# 快捷键停止录音修复 ✅ 完成
+
+## 问题描述
+快捷键触发停止录音操作时，系统麦克风没有正常关闭，录音器仍在后台运行。
+
+## 问题分析
+快捷键处理中直接调用了 `fullTaskManager.updateTaskState()` 来更新任务状态，但这只是更新了数据库中的状态，没有实际调用录音管理器的 `stopTask` 或 `cancelTask` 方法来停止录音器。
+
+### 根本原因
+- 快捷键处理逻辑错误：直接更新任务状态而不是调用录音管理器的停止方法
+- 录音器实例没有被正确停止：`node-record-lpcm16` 的录音器实例仍在运行
+- 麦克风资源没有被释放：系统麦克风仍然被占用
+
+## 修复内容
+
+### 1. 修复停止录音快捷键 ✅ 完成
+- [x] 修改 `ShortcutAction.STOP_RECORDING` 处理逻辑
+  - [x] 从直接调用 `fullTaskManager.updateTaskState()` 改为调用 `recordingManager.stopTask()`
+  - [x] 确保录音器实例被正确停止
+  - [x] 确保麦克风资源被释放
+
+### 2. 修复取消录音快捷键 ✅ 完成
+- [x] 修改 `ShortcutAction.CANCEL_RECORDING` 处理逻辑
+  - [x] 从直接调用 `fullTaskManager.updateTaskState()` 改为调用 `recordingManager.cancelTask()`
+  - [x] 确保录音器实例被正确停止并删除音频文件
+  - [x] 确保麦克风资源被释放
+
+### 3. 方法调用链路修复 ✅ 完成
+- [x] 确认 `BaseSubTaskManager.stopTask()` 方法会调用 `onStopTask()`
+- [x] 确认 `BaseSubTaskManager.cancelTask()` 方法会调用 `onCancelTask()`
+- [x] 确认 `RecordingSubTaskManager.onStopTask()` 会调用 `stopRecording()`
+- [x] 确认 `RecordingSubTaskManager.onCancelTask()` 会调用 `cancelRecording()`
+
+## 技术细节
+- **正确的调用链路**：快捷键 → `recordingManager.stopTask()` → `onStopTask()` → `stopRecording()` → `recorder.stop()`
+- **录音器停止**：`node-record-lpcm16` 的 `recorder.stop()` 方法会正确停止录音并释放麦克风
+- **文件流关闭**：`fileStream.end()` 确保文件流被正确关闭
+- **资源清理**：从 `activeRecordings` 映射中移除录音实例
+
+## 测试验证
+- [x] 快捷键 `Cmd+Shift+S` 停止录音时麦克风正确关闭
+- [x] 快捷键 `Cmd+Shift+C` 取消录音时麦克风正确关闭
+- [x] 录音器实例被正确停止和清理
+- [x] 系统麦克风资源被正确释放
+- [x] 不影响其他录音功能（UI按钮、IPC调用等）
+
+## 影响评估
+- ✅ 修复了快捷键停止录音时麦克风不关闭的严重bug
+- ✅ 确保系统麦克风资源被正确释放
+- ✅ 提高了录音功能的可靠性
+- ✅ 改善了用户体验，避免麦克风被意外占用
+- ✅ 保持了与UI按钮和IPC调用的一致性
+
+--- 

@@ -1,13 +1,60 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import path from 'path';
-import { ShortcutManager } from './shortcut';
-import { initializeAudioRecorder, setupAudioIPC, audioRecorder } from './audio';
-import { initializeTaskManager, TaskManager } from './taskManager';
-import { initializeIPC } from './ipc';
+import { ShortcutManager, setShortcutTaskManagers } from './shortcut';
+import { FullTaskManager } from './experimental/managers/FullTaskManager';
+import { RecordingSubTaskManager } from './experimental/managers/RecordingSubTaskManager';
+import { initializeIPC, setTaskManagers } from './ipc';
 
 let shortcutManager: ShortcutManager | null = null;
 let isQuitting = false;
 let tray: Tray | null = null;
+
+// 新的任务管理器实例
+let fullTaskManager: FullTaskManager | null = null;
+let recordingManager: RecordingSubTaskManager | null = null;
+
+// 初始化新的任务管理系统
+async function initializeNewTaskManagerSystem() {
+  try {
+    console.log('Initializing new TaskManager system...');
+    
+    // 初始化FullTaskManager（使用单例模式）
+    fullTaskManager = await FullTaskManager.getInstance({
+      storageDirectory: path.join(app.getPath('userData'), 'tasks'),
+      maxConcurrentTasks: 10
+    });
+    
+    // 获取存储实例
+    const storage = fullTaskManager.getStorage();
+    
+    // 初始化RecordingSubTaskManager - 传递FullTaskManager和storage
+    recordingManager = new RecordingSubTaskManager(fullTaskManager, storage);
+    
+    // 注册RecordingSubTaskManager到FullTaskManager
+    fullTaskManager.registerSubTaskManager('RECORDING', recordingManager);
+    
+    console.log('New TaskManager system initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize new TaskManager system:', error);
+    throw error;
+  }
+}
+
+// 清理任务管理器
+async function cleanupTaskManager() {
+  try {
+    if (recordingManager) {
+      await recordingManager.cleanup();
+      recordingManager = null;
+    }
+    if (fullTaskManager) {
+      await fullTaskManager.close();
+      fullTaskManager = null;
+    }
+  } catch (error) {
+    console.error('Error during task manager cleanup:', error);
+  }
+}
 
 function createTray(mainWindow: BrowserWindow) {
   // 创建托盘图标
@@ -49,7 +96,7 @@ function createTray(mainWindow: BrowserWindow) {
 
     // 更新菜单的函数
     const updateMenu = async () => {
-      const isRecording = audioRecorder?.getStatus().isRecording || false;
+      const isRecording = recordingManager?.isRecording() || false;
       
       const contextMenu = Menu.buildFromTemplate([
         {
@@ -151,10 +198,11 @@ function createWindow() {
     if (!isQuitting) {
       event.preventDefault();
       // 如果有正在进行的录音，先停止
-      const currentTask = await TaskManager.getCurrentRecordingTask();
-      if (currentTask && audioRecorder?.getStatus().isRecording) {
-        await audioRecorder.stopRecording();
-        await TaskManager.updateTask(currentTask.id, { status: 'backlog' });
+      if (recordingManager?.isRecording()) {
+        const currentTaskId = recordingManager.getCurrentRecordingTaskId();
+        if (currentTaskId) {
+          await recordingManager.stopRecordingForAdapter(currentTaskId);
+        }
       }
       mainWindow?.hide();
     }
@@ -169,6 +217,12 @@ function createWindow() {
 // 初始化快捷键管理器
 async function initializeShortcutManager() {
   shortcutManager = new ShortcutManager();
+  
+  // 设置任务管理器实例到快捷键管理器
+  if (fullTaskManager && recordingManager) {
+    setShortcutTaskManagers(fullTaskManager, recordingManager);
+  }
+  
   // 已迁移为 globalShortcut，无需辅助功能权限检查
 }
 
@@ -177,10 +231,11 @@ export async function quitApp() {
   isQuitting = true;
   
   // 如果有正在进行的录音，先停止
-  const currentTask = await TaskManager.getCurrentRecordingTask();
-  if (currentTask && audioRecorder?.getStatus().isRecording) {
-    await audioRecorder.stopRecording();
-    await TaskManager.updateTask(currentTask.id, { status: 'backlog' });
+  if (recordingManager?.isRecording()) {
+    const currentTaskId = recordingManager.getCurrentRecordingTaskId();
+    if (currentTaskId) {
+      await recordingManager.stopRecordingForAdapter(currentTaskId);
+    }
   }
 
   // 清理快捷键管理器
@@ -195,6 +250,9 @@ export async function quitApp() {
     tray = null;
   }
 
+  // 清理任务管理器
+  await cleanupTaskManager();
+
   // 关闭所有窗口
   BrowserWindow.getAllWindows().forEach(window => {
     window.destroy();
@@ -205,16 +263,17 @@ export async function quitApp() {
 }
 
 app.whenReady().then(async () => {
-  // 先初始化录音器
-  initializeAudioRecorder();
-
-  // 初始化任务管理器
-  initializeTaskManager();
-  setupAudioIPC();
+  // 初始化新的任务管理系统
+  await initializeNewTaskManagerSystem();
 
   // 然后创建窗口和设置快捷键
   const mainWindow = createWindow();
   await initializeShortcutManager();
+  
+  // 设置任务管理器实例到IPC处理器
+  if (fullTaskManager && recordingManager) {
+    setTaskManagers(fullTaskManager, recordingManager);
+  }
   
   // 初始化 IPC 通信
   if (shortcutManager) {
@@ -249,12 +308,14 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async () => {
   isQuitting = true;
   // 如果有正在进行的录音，先停止
-  const currentTask = await TaskManager.getCurrentRecordingTask();
-  if (currentTask && audioRecorder?.getStatus().isRecording) {
-    await audioRecorder.stopRecording();
-    await TaskManager.updateTask(currentTask.id, { status: 'backlog' });
+  if (recordingManager?.isRecording()) {
+    const currentTaskId = recordingManager.getCurrentRecordingTaskId();
+    if (currentTaskId) {
+      await recordingManager.stopRecordingForAdapter(currentTaskId);
+    }
   }
   if (shortcutManager) {
     shortcutManager.cleanup();
   }
+  await cleanupTaskManager();
 }); 

@@ -1,401 +1,445 @@
 /* 
- * This module provides shared modal styles for settings components,
- * ensuring consistent UI appearance across different settings panels.
+ * 此模块为设置组件提供共享的模态框样式，
+ * 确保不同设置面板之间的一致UI外观。
  */
 
-/* Modal Container */
+/* ===== 模态框容器 ===== */
+/* 模态框遮罩层，覆盖整个屏幕 */
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
+  position: fixed; /* 固定定位，相对于视口 */
+  top: 0; /* 顶部对齐 */
+  left: 0; /* 左侧对齐 */
+  right: 0; /* 右侧对齐 */
+  bottom: 0; /* 底部对齐 */
+  display: flex; /* 使用弹性布局 */
+  align-items: center; /* 垂直居中对齐 */
+  justify-content: center; /* 水平居中对齐 */
+  background-color: rgba(0, 0, 0, 0.4); /* 半透明黑色背景 */
+  backdrop-filter: blur(4px); /* 背景模糊效果，4px模糊半径 */
+  z-index: 1000; /* 层级1000，确保在最上层 */
+  animation: fadeIn 0.2s ease-out; /* 淡入动画，持续0.2秒，缓出效果 */
 }
 
+/* 淡入动画关键帧 */
 @keyframes fadeIn {
   from {
-    opacity: 0;
+    opacity: 0; /* 起始透明度为0 */
   }
   to {
-    opacity: 1;
+    opacity: 1; /* 结束透明度为1 */
   }
 }
 
+/* 模态框主容器 */
 .modal-container {
-  position: relative;
-  width: 500px;
-  max-width: 90vw;
-  max-height: 90vh;
-  background-color: var(--background-color);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  animation: slideIn 0.2s ease-out;
-  transform-origin: center;
-  margin: 0 auto;
-  color: var(--text-primary);
+  position: relative; /* 相对定位 */
+  width: 500px; /* 固定宽度500px */
+  max-width: 90vw; /* 最大宽度90%视口宽度 */
+  max-height: 90vh; /* 最大高度90%视口高度 */
+  background-color: var(--background-color); /* 使用CSS变量设置背景色 */
+  border: 1px solid var(--border-color); /* 1px实线边框 */
+  border-radius: 10px; /* 10px圆角 */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+  display: flex; /* 使用弹性布局 */
+  flex-direction: column; /* 垂直排列 */
+  animation: slideIn 0.2s ease-out; /* 滑入动画，持续0.2秒，缓出效果 */
+  transform-origin: center; /* 变换原点为中心 */
+  margin: 0 auto; /* 水平居中 */
+  color: var(--text-primary); /* 使用CSS变量设置文字颜色 */
 }
 
+/* 滑入动画关键帧 */
 @keyframes slideIn {
   from {
-    opacity: 0;
-    transform: scale(0.95);
+    opacity: 0; /* 起始透明度为0 */
+    transform: scale(0.95); /* 起始缩放为0.95 */
   }
   to {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 1; /* 结束透明度为1 */
+    transform: scale(1); /* 结束缩放为1 */
   }
 }
 
-/* Modal Header */
+/* ===== 模态框头部 ===== */
+/* 模态框标题栏 */
 .modal-header {
-  position: sticky;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--toolbar-background);
-  backdrop-filter: blur(10px);
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-  z-index: 2;
+  position: sticky; /* 粘性定位 */
+  top: 0; /* 顶部对齐 */
+  display: flex; /* 使用弹性布局 */
+  align-items: center; /* 垂直居中对齐 */
+  justify-content: space-between; /* 两端对齐，中间留空 */
+  padding: 12px 16px; /* 上下12px，左右16px的内边距 */
+  border-bottom: 1px solid var(--border-color); /* 底部1px实线边框 */
+  background-color: var(--toolbar-background); /* 使用CSS变量设置背景色 */
+  backdrop-filter: blur(10px); /* 背景模糊效果，10px模糊半径 */
+  border-top-left-radius: 10px; /* 左上角圆角 */
+  border-top-right-radius: 10px; /* 右上角圆角 */
+  z-index: 2; /* 层级2 */
 }
 
+/* 模态框标题 */
 .modal-header h2 {
-  font-size: 15px;
-  font-weight: 500;
-  margin: 0;
-  color: var(--text-primary);
+  font-size: 15px; /* 15px字体大小 */
+  font-weight: 500; /* 中等字重 */
+  margin: 0; /* 无外边距 */
+  color: var(--text-primary); /* 使用CSS变量设置主要文字颜色 */
 }
 
-/* Close Button */
+/* ===== 关闭按钮 ===== */
+/* 模态框关闭按钮 */
 .close-button {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  transition: all 0.2s;
+  background: none; /* 无背景 */
+  border: none; /* 无边框 */
+  color: var(--text-secondary); /* 使用CSS变量设置次要文字颜色 */
+  font-size: 20px; /* 20px字体大小 */
+  cursor: pointer; /* 鼠标指针样式 */
+  padding: 0; /* 无内边距 */
+  width: 24px; /* 宽度24px */
+  height: 24px; /* 高度24px */
+  display: flex; /* 使用弹性布局 */
+  align-items: center; /* 垂直居中对齐 */
+  justify-content: center; /* 水平居中对齐 */
+  border-radius: 12px; /* 12px圆角，形成圆形 */
+  transition: all 0.2s; /* 所有属性过渡动画，持续0.2秒 */
 }
 
+/* 关闭按钮的悬停效果 */
 .close-button:hover {
-  background-color: var(--hover-background);
-  color: var(--text-primary);
+  background-color: var(--hover-background); /* 悬停时的背景色 */
+  color: var(--text-primary); /* 悬停时的文字颜色 */
 }
 
-/* Modal Content Wrapper */
+/* ===== 模态框内容包装器 ===== */
+/* 模态框内容的包装容器 */
 .modal-content-wrapper {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  flex: 1; /* 占据剩余空间 */
+  min-height: 0; /* 最小高度为0 */
+  display: flex; /* 使用弹性布局 */
+  flex-direction: column; /* 垂直排列 */
 }
 
-/* Modal Content */
+/* ===== 模态框内容区域 ===== */
+/* 模态框的主要内容区域 */
 .modal-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  flex: 1; /* 占据剩余空间 */
+  overflow-y: auto; /* 垂直方向可滚动 */
+  padding: 16px; /* 16px内边距 */
+  display: flex; /* 使用弹性布局 */
+  flex-direction: column; /* 垂直排列 */
+  gap: 24px; /* 子元素之间的间距 */
 }
 
-/* Form Styles */
+/* ===== 表单样式 ===== */
+/* 设置区域容器 */
 .settings-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background-color: var(--toolbar-background);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 16px;
+  display: flex; /* 使用弹性布局 */
+  flex-direction: column; /* 垂直排列 */
+  gap: 16px; /* 子元素之间的间距 */
+  background-color: var(--toolbar-background); /* 使用CSS变量设置背景色 */
+  border: 1px solid var(--border-color); /* 1px实线边框 */
+  border-radius: 8px; /* 8px圆角 */
+  padding: 16px; /* 16px内边距 */
 }
 
+/* 设置区域标题 */
 .settings-section h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-color);
+  margin: 0; /* 无外边距 */
+  font-size: 14px; /* 14px字体大小 */
+  font-weight: 600; /* 半粗体 */
+  color: var(--text-primary); /* 使用CSS变量设置主要文字颜色 */
+  padding-bottom: 8px; /* 底部内边距8px */
+  border-bottom: 1px solid var(--border-color); /* 底部1px实线边框 */
 }
 
+/* 表单组容器 */
 .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px 0;
+  display: flex; /* 使用弹性布局 */
+  flex-direction: column; /* 垂直排列 */
+  gap: 8px; /* 子元素之间的间距 */
+  padding: 4px 0; /* 上下4px，左右0的内边距 */
 }
 
+/* 表单标签 */
 .form-group label {
-  font-size: 13px;
-  color: var(--text-secondary);
-  font-weight: 500;
+  font-size: 13px; /* 13px字体大小 */
+  color: var(--text-secondary); /* 使用CSS变量设置次要文字颜色 */
+  font-weight: 500; /* 中等字重 */
 }
 
+/* 文本输入框、URL输入框、数字输入框、选择框的基础样式 */
 .form-group input[type="text"],
 .form-group input[type="url"],
 .form-group input[type="number"],
 .form-group select {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--background-color);
-  color: var(--text-primary);
-  font-size: 13px;
-  transition: all 0.2s;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 32px;
+  padding: 8px 12px; /* 上下8px，左右12px的内边距 */
+  border: 1px solid var(--border-color); /* 1px实线边框 */
+  border-radius: 6px; /* 6px圆角 */
+  background-color: var(--background-color); /* 使用CSS变量设置背景色 */
+  color: var(--text-primary); /* 使用CSS变量设置主要文字颜色 */
+  font-size: 13px; /* 13px字体大小 */
+  transition: all 0.2s; /* 所有属性过渡动画，持续0.2秒 */
+  width: 100%; /* 占满容器宽度 */
+  box-sizing: border-box; /* 盒模型包含边框和内边距 */
+  min-height: 32px; /* 最小高度32px */
 }
 
+/* 输入框和选择框的悬停效果 */
 .form-group input[type="text"]:hover,
 .form-group input[type="url"]:hover,
 .form-group input[type="number"]:hover,
 .form-group select:hover {
-  border-color: var(--text-secondary);
+  border-color: var(--text-secondary); /* 悬停时的边框色 */
 }
 
+/* 输入框和选择框的焦点状态 */
 .form-group input[type="text"]:focus,
 .form-group input[type="url"]:focus,
 .form-group input[type="number"]:focus,
 .form-group select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  outline: none; /* 移除默认焦点轮廓 */
+  border-color: #3b82f6; /* 焦点时的蓝色边框 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); /* 焦点时的蓝色阴影 */
 }
 
-/* 确保所有输入框和选择框有一致的高度 */
+/* 选择框的特殊样式 */
 .form-group select {
-  height: 32px;
-  padding: 4px 12px;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
+  height: 32px; /* 固定高度32px */
+  padding: 4px 12px; /* 上下4px，左右12px的内边距 */
+  appearance: none; /* 移除默认外观 */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); /* 自定义下拉箭头图标 */
+  background-repeat: no-repeat; /* 不重复背景图片 */
+  background-position: right 12px center; /* 背景图片位置：右侧12px，垂直居中 */
+  padding-right: 32px; /* 右侧内边距32px，为箭头留出空间 */
 }
 
 /* 修复数字输入框的箭头样式 */
 .form-group input[type="number"] {
-  -moz-appearance: textfield;
+  -moz-appearance: textfield; /* Firefox中移除数字输入框的箭头 */
 }
 
+/* Webkit浏览器中移除数字输入框的箭头 */
 .form-group input[type="number"]::-webkit-outer-spin-button,
 .form-group input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+  -webkit-appearance: none; /* 移除默认外观 */
+  margin: 0; /* 无外边距 */
 }
 
-/* 确保复选框和标签对齐 */
+/* 复选框标签的特殊样式 */
 .form-group label:has(input[type="checkbox"]) {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-primary);
-  cursor: pointer;
-  padding: 4px 0;
+  display: inline-flex; /* 行内弹性布局 */
+  align-items: center; /* 垂直居中对齐 */
+  color: var(--text-primary); /* 使用CSS变量设置主要文字颜色 */
+  cursor: pointer; /* 鼠标指针样式 */
+  padding: 4px 0; /* 上下4px，左右0的内边距 */
 }
 
+/* 复选框样式 */
 .form-group input[type="checkbox"] {
-  margin: 0 8px 0 0;
-  cursor: pointer;
+  margin: 0 8px 0 0; /* 上右下左的外边距，右侧8px */
+  cursor: pointer; /* 鼠标指针样式 */
 }
 
+/* 表单说明文字 */
 .form-group small {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
+  display: block; /* 块级元素 */
+  margin-top: 0.25rem; /* 顶部外边距0.25rem */
+  font-size: 0.75rem; /* 12px字体大小 */
+  color: var(--text-secondary); /* 使用CSS变量设置次要文字颜色 */
 }
 
-/* Buttons */
+/* ===== 按钮样式 ===== */
+/* 基础按钮样式 */
 .btn {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background-color: var(--background-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  padding: 6px 12px; /* 上下6px，左右12px的内边距 */
+  border-radius: 6px; /* 6px圆角 */
+  font-size: 13px; /* 13px字体大小 */
+  cursor: pointer; /* 鼠标指针样式 */
+  transition: all 0.2s; /* 所有属性过渡动画，持续0.2秒 */
+  background-color: var(--background-color); /* 使用CSS变量设置背景色 */
+  border: 1px solid var(--border-color); /* 1px实线边框 */
+  color: var(--text-primary); /* 使用CSS变量设置主要文字颜色 */
 }
 
+/* 按钮的悬停效果 */
 .btn:hover {
-  background-color: var(--hover-background);
-  border-color: var(--text-secondary);
+  background-color: var(--hover-background); /* 悬停时的背景色 */
+  border-color: var(--text-secondary); /* 悬停时的边框色 */
 }
 
+/* 主要按钮样式 */
 .btn-primary {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-  color: white;
+  background-color: #3b82f6; /* 蓝色背景 */
+  border-color: #3b82f6; /* 蓝色边框 */
+  color: white; /* 白色文字 */
 }
 
+/* 主要按钮的悬停效果 */
 .btn-primary:hover {
-  background-color: #2563eb;
-  border-color: #2563eb;
+  background-color: #2563eb; /* 悬停时的深蓝色背景 */
+  border-color: #2563eb; /* 悬停时的深蓝色边框 */
 }
 
-/* Action Buttons */
+/* ===== 操作按钮区域 ===== */
+/* 模态框底部操作按钮区域 */
 .modal-actions {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 16px;
-  background-color: var(--toolbar-background);
-  border-top: 1px solid var(--border-color);
-  z-index: 2;
+  position: sticky; /* 粘性定位 */
+  bottom: 0; /* 底部对齐 */
+  display: flex; /* 使用弹性布局 */
+  justify-content: flex-end; /* 右对齐 */
+  gap: 8px; /* 按钮之间的间距 */
+  padding: 16px; /* 16px内边距 */
+  background-color: var(--toolbar-background); /* 使用CSS变量设置背景色 */
+  border-top: 1px solid var(--border-color); /* 顶部1px实线边框 */
+  z-index: 2; /* 层级2 */
 }
 
+/* 操作按钮区域中的按钮 */
 .modal-actions .btn {
-  flex: 1;
+  flex: 1; /* 占据剩余空间 */
 }
 
-/* Messages */
+/* ===== 消息样式 ===== */
+/* 消息容器基础样式 */
 .message {
-  padding: 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  margin-top: 8px;
+  padding: 12px; /* 12px内边距 */
+  border-radius: 6px; /* 6px圆角 */
+  font-size: 13px; /* 13px字体大小 */
+  margin-top: 8px; /* 顶部外边距8px */
 }
 
+/* 错误消息样式 */
 .message-error {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background-color: rgba(239, 68, 68, 0.1); /* 红色背景，10%透明度 */
+  color: #ef4444; /* 红色文字 */
+  border: 1px solid rgba(239, 68, 68, 0.2); /* 红色边框，20%透明度 */
 }
 
+/* 警告消息样式 */
 .message-warning {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background-color: rgba(245, 158, 11, 0.1); /* 橙色背景，10%透明度 */
+  color: #f59e0b; /* 橙色文字 */
+  border: 1px solid rgba(245, 158, 11, 0.2); /* 橙色边框，20%透明度 */
 }
 
+/* 成功消息样式 */
 .message-success {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background-color: rgba(16, 185, 129, 0.1); /* 绿色背景，10%透明度 */
+  color: #10b981; /* 绿色文字 */
+  border: 1px solid rgba(16, 185, 129, 0.2); /* 绿色边框，20%透明度 */
 }
 
+/* 消息内容样式 */
 .message div {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.25rem; /* 底部外边距0.25rem */
 }
 
+/* 最后一个消息内容无底部外边距 */
 .message div:last-child {
-  margin-bottom: 0;
+  margin-bottom: 0; /* 无底部外边距 */
 }
 
-/* Scrollbar Styles */
+/* ===== 滚动条样式 ===== */
+/* Webkit浏览器的滚动条样式 */
 .modal-content::-webkit-scrollbar {
-  width: 8px;
+  width: 8px; /* 滚动条宽度8px */
 }
 
+/* 滚动条轨道样式 */
 .modal-content::-webkit-scrollbar-track {
-  background: transparent;
+  background: transparent; /* 透明背景 */
 }
 
+/* 滚动条滑块样式 */
 .modal-content::-webkit-scrollbar-thumb {
-  background-color: var(--border-color);
-  border-radius: 4px;
-  border: 2px solid var(--background-color);
+  background-color: var(--border-color); /* 使用CSS变量设置背景色 */
+  border-radius: 4px; /* 4px圆角 */
+  border: 2px solid var(--background-color); /* 2px实线边框 */
 }
 
-/* Responsive Design */
+/* ===== 响应式设计 ===== */
+/* 小屏幕适配 */
 @media (max-width: 768px) {
   .modal-container {
-    width: 95%;
-    max-width: none;
-    height: 90vh;
-    margin: 1rem;
+    width: 95%; /* 宽度95% */
+    max-width: none; /* 无最大宽度限制 */
+    height: 90vh; /* 高度90%视口高度 */
+    margin: 1rem; /* 1rem外边距 */
   }
   
   .modal-content {
-    padding: 1rem;
+    padding: 1rem; /* 1rem内边距 */
   }
   
   .modal-actions {
-    flex-direction: column;
-    padding: 1rem;
+    flex-direction: column; /* 垂直排列 */
+    padding: 1rem; /* 1rem内边距 */
   }
   
   .modal-actions .btn {
-    width: 100%;
+    width: 100%; /* 占满容器宽度 */
   }
 }
 
-/* Shortcut Settings Styles */
+/* ===== 快捷键设置样式 ===== */
+/* 快捷键列表容器 */
 .shortcut-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: flex; /* 使用弹性布局 */
+  flex-direction: column; /* 垂直排列 */
+  gap: 16px; /* 子元素之间的间距 */
 }
 
+/* 快捷键项目容器 */
 .shortcut-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  background-color: var(--toolbar-background);
-  border-radius: 8px;
-  transition: background-color 0.2s;
+  display: flex; /* 使用弹性布局 */
+  justify-content: space-between; /* 两端对齐，中间留空 */
+  align-items: center; /* 垂直居中对齐 */
+  padding: 12px; /* 12px内边距 */
+  background-color: var(--toolbar-background); /* 使用CSS变量设置背景色 */
+  border-radius: 8px; /* 8px圆角 */
+  transition: background-color 0.2s; /* 背景色过渡动画，持续0.2秒 */
 }
 
+/* 快捷键项目的悬停效果 */
 .shortcut-item:hover {
-  background-color: var(--hover-background);
+  background-color: var(--hover-background); /* 悬停时的背景色 */
 }
 
+/* 快捷键描述文字 */
 .shortcut-description {
-  font-size: 14px;
-  color: var(--text-primary);
+  font-size: 14px; /* 14px字体大小 */
+  color: var(--text-primary); /* 使用CSS变量设置主要文字颜色 */
 }
 
+/* 快捷键控制区域 */
 .shortcut-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  display: flex; /* 使用弹性布局 */
+  gap: 8px; /* 子元素之间的间距 */
+  align-items: center; /* 垂直居中对齐 */
 }
 
+/* 快捷键按键显示 */
 .shortcut-key {
-  padding: 6px 12px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  font-size: 13px;
-  min-width: 80px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: white;
+  padding: 6px 12px; /* 上下6px，左右12px的内边距 */
+  background-color: rgba(255, 255, 255, 0.1); /* 白色背景，10%透明度 */
+  border: 1px solid rgba(255, 255, 255, 0.2); /* 白色边框，20%透明度 */
+  border-radius: 6px; /* 6px圆角 */
+  font-size: 13px; /* 13px字体大小 */
+  min-width: 80px; /* 最小宽度80px */
+  text-align: center; /* 文字居中对齐 */
+  cursor: pointer; /* 鼠标指针样式 */
+  transition: all 0.2s; /* 所有属性过渡动画，持续0.2秒 */
+  color: white; /* 白色文字 */
 }
 
+/* 快捷键按键的悬停效果 */
 .shortcut-key:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.15); /* 悬停时的背景色，15%透明度 */
+  border-color: rgba(255, 255, 255, 0.3); /* 悬停时的边框色，30%透明度 */
 }
 
+/* 录制状态的快捷键按键 */
 .shortcut-key.recording {
-  background-color: rgba(0, 122, 255, 0.3);
-  border-color: #007aff;
-  color: white;
+  background-color: rgba(0, 122, 255, 0.3); /* 蓝色背景，30%透明度 */
+  border-color: #007aff; /* 蓝色边框 */
+  color: white; /* 白色文字 */
 } 

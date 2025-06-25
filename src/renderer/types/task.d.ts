@@ -1,9 +1,19 @@
 export interface Task {
   id: string;
-  title: string;
-  status: 'backlog' | 'recording' | 'completed';
-  createdAt: string;
-  updatedAt: string;
-  audioPath?: string;
-  duration?: number;
+  type: string;
+  state: string;
+  metadata: {
+    name: string;
+    description?: string;
+    tags?: string[];
+    createdAt: number;
+    updatedAt: number;
+  };
+  progress: number;
+  error?: string;
+  extendedData?: any; // For task-specific extended data
+  recordingMetadata?: {
+    outputPath?: string;
+    [key: string]: any;
+  };
 } 

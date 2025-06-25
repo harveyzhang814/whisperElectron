@@ -9,14 +9,12 @@ contextBridge.exposeInMainWorld('electron', {
   getShortcuts: () => ipcRenderer.invoke('shortcuts:get'),
   updateShortcut: (action: string, config: any) => ipcRenderer.invoke('shortcuts:update', action, config),
 
-  // Audio recording related
-  startRecording: () => ipcRenderer.invoke('audio:start'),
-  stopRecording: () => ipcRenderer.invoke('audio:stop'),
-  cancelRecording: () => ipcRenderer.invoke('audio:cancel'),
-  getRecordingStatus: () => ipcRenderer.invoke('audio:getStatus'),
-  updateAudioConfig: (config: any) => ipcRenderer.invoke('audio:updateConfig', config),
-  deleteAudioFile: (audioPath: string) => ipcRenderer.invoke('audio:deleteFile', audioPath),
-  getCurrentRecordingTask: () => ipcRenderer.invoke('task:getCurrentRecording'),
+  // Recording related - 使用新的recording:接口
+  startRecording: (taskId?: string) => ipcRenderer.invoke('recording:start', taskId),
+  stopRecording: (taskId?: string) => ipcRenderer.invoke('recording:stop', taskId),
+  cancelRecording: () => ipcRenderer.invoke('recording:cancel'),
+  getRecordingStatus: () => ipcRenderer.invoke('recording:getStatus'),
+  getCurrentRecordingTask: () => ipcRenderer.invoke('recording:getCurrentTask'),
   onRecordingStatus: (callback: (status: any) => void) => {
     ipcRenderer.on('recording:status', (_event, status) => callback(status));
   },
@@ -47,12 +45,12 @@ contextBridge.exposeInMainWorld('electron', {
   // App control
   quitApp: () => ipcRenderer.invoke('app:quit'),
 
-  // Task related
-  createTask: (title: string, status: string) => ipcRenderer.invoke('task:create', title, status),
+  // Task related - 使用新的任务管理系统
+  createTask: (title: string) => ipcRenderer.invoke('task:create', title),
   updateTask: (id: string, updates: any) => ipcRenderer.invoke('task:update', id, updates),
   getAllTasks: () => ipcRenderer.invoke('task:getAll'),
   deleteTask: (id: string) => ipcRenderer.invoke('task:delete', id),
-  openAudioFile: (audioPath: string) => ipcRenderer.invoke('task:openAudioFile', audioPath),
+  getCurrentRecording: () => ipcRenderer.invoke('task:getCurrentRecording'),
 
   // Task refresh event
   onTaskRefresh: (callback: () => void) => ipcRenderer.on('task:refresh', callback),
@@ -85,4 +83,5 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.removeAllListeners('whisper:complete');
     ipcRenderer.removeAllListeners('whisper:error');
   },
+  openAudioFile: (audioPath: string) => ipcRenderer.invoke('audio:openFile', audioPath),
 }); 

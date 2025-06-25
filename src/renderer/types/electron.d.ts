@@ -1,8 +1,14 @@
 interface RecordingResult {
   success: boolean;
-  path?: string;
+  taskId?: string;
   error?: string;
-  isRecording?: boolean;
+}
+
+interface TaskResult {
+  success: boolean;
+  task?: any;
+  tasks?: any[];
+  error?: string;
 }
 
 // Whisper 相关类型定义
@@ -84,17 +90,13 @@ export interface ElectronAPI {
   getShortcuts: () => Promise<ShortcutConfig[]>;
   updateShortcut: (action: string, config: Partial<ShortcutConfig>) => Promise<void>;
   
-  // Audio recording related methods
-  startRecording: () => Promise<RecordingResult>;
-  stopRecording: () => Promise<RecordingResult>;
-  cancelRecording: () => Promise<{ success: boolean; error?: string }>;
-  getRecordingStatus: () => Promise<{ isRecording: boolean }>;
-  updateAudioConfig: (config: Partial<AudioConfig>) => Promise<{ success: boolean; error?: string }>;
-  deleteAudioFile: (audioPath: string) => Promise<{ success: boolean; error?: string }>;
-  getCurrentRecordingTask: () => Promise<Task | null>;
+  // Recording related methods - 使用新的recording:接口
+  startRecording: (taskId?: string) => Promise<RecordingResult>;
+  stopRecording: (taskId?: string) => Promise<RecordingResult>;
+  cancelRecording: () => Promise<RecordingResult>;
+  getCurrentRecordingTask: () => Promise<TaskResult>;
   onRecordingStatus: (callback: (status: { isRecording: boolean }) => void) => void;
   removeRecordingStatusListener: () => void;
-  sendRecordingStatus: (status: { isRecording: boolean }) => void;
 
   // Tray related methods
   onRecordingStart: (callback: () => void) => void;
@@ -106,12 +108,11 @@ export interface ElectronAPI {
   // App control methods
   quitApp: () => Promise<void>;
 
-  // Task related methods
-  createTask: (title: string, status: string) => Promise<Task>;
-  updateTask: (id: string, updates: Partial<Task>) => Promise<{ success: boolean }>;
-  getAllTasks: () => Promise<Task[]>;
-  deleteTask: (id: string) => Promise<{ success: boolean }>;
-  openAudioFile: (audioPath: string) => Promise<{ success: boolean }>;
+  // Task related methods - 使用新的任务管理系统
+  createTask: (title: string) => Promise<TaskResult>;
+  updateTask: (id: string, updates: any) => Promise<TaskResult>;
+  getAllTasks: () => Promise<TaskResult>;
+  deleteTask: (id: string) => Promise<TaskResult>;
 
   // Task refresh event
   onTaskRefresh: (callback: () => void) => void;
@@ -134,6 +135,8 @@ export interface ElectronAPI {
   onWhisperComplete: (callback: (result: any) => void) => void;
   onWhisperError: (callback: (error: any) => void) => void;
   removeWhisperListeners: () => void;
+
+  openAudioFile: (audioPath: string) => void;
 }
 
 interface Window {

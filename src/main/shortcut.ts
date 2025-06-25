@@ -1,6 +1,20 @@
 import { globalShortcut, BrowserWindow } from 'electron';
-import { audioRecorder } from './audio';
-import { TaskManager } from './taskManager';
+import { FullTaskManager } from './experimental/managers/FullTaskManager';
+import { RecordingSubTaskManager } from './experimental/managers/RecordingSubTaskManager';
+import { TaskMetadata } from './experimental/types/task';
+
+// 全局任务管理器实例（在index.ts中初始化）
+let fullTaskManager: FullTaskManager | null = null;
+let recordingManager: RecordingSubTaskManager | null = null;
+
+// 设置任务管理器实例（由index.ts调用）
+export function setShortcutTaskManagers(
+  taskManager: FullTaskManager,
+  recordingTaskManager: RecordingSubTaskManager
+) {
+  fullTaskManager = taskManager;
+  recordingManager = recordingTaskManager;
+}
 
 // 快捷键动作类型
 export enum ShortcutAction {
@@ -81,98 +95,73 @@ export class ShortcutManager {
   }
 
   private async handleShortcut(action: ShortcutAction) {
-    if (!audioRecorder) {
-      console.error('Audio recorder not initialized');
+    if (!recordingManager || !fullTaskManager) {
+      console.error('Task managers not initialized');
       return;
     }
 
-    const status = audioRecorder.getStatus();
+    const isRecording = recordingManager.isRecording();
     
     switch (action) {
       // 快捷键触发开始录音
       case ShortcutAction.START_RECORDING:
-        if (!status.isRecording) {
+        if (!isRecording) {
           try {
-            // 创建新任务
-            const now = new Date().toISOString();
-            const title = `Recording-${now}`;
-            const task = await TaskManager.createTask(title, 'recording');
-            console.log('Created new task:', task);
+            // 直接调用任务管理器开始录音
+            const taskMetadata: TaskMetadata = {
+              name: 'New Recording',
+              description: 'Audio recording task',
+              tags: ['recording'],
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            };
+
+            const task = await fullTaskManager.createTask('RECORDING', taskMetadata);
+            await fullTaskManager.startTask(task.id);
             
-            // 开始录音
-            const result = await audioRecorder.startRecording();
-            if (!result.success) {
-              // 如果录音失败，将任务状态改回 backlog
-              await TaskManager.updateTask(task.id, { status: 'backlog' });
-              console.error('Failed to start recording:', result.error);
-            }
-            // 发送刷新事件
-            BrowserWindow.getAllWindows()[0]?.webContents.send('task:refresh');
+            console.log('Started recording via shortcut:', task.id);
             // 发送录音状态更新
             BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: true });
           } catch (error) {
-            console.error('Error in START_RECORDING:', error);
+            console.error('Error in START_RECORDING shortcut:', error);
           }
         }
         break;
       
       // 快捷键触发停止录音
       case ShortcutAction.STOP_RECORDING:
-        if (status.isRecording) {
+        if (isRecording) {
           try {
-            // 获取当前录音任务
-            const currentTask = await TaskManager.getCurrentRecordingTask();
-            if (!currentTask) {
-              console.error('未找到当前录音任务');
-              return;
-            }
-
-            // 停止录音
-            const result = await audioRecorder.stopRecording();
-            if (result.success) {
-              // 更新任务状态和音频路径
-              await TaskManager.updateTask(currentTask.id, {
-                status: 'completed',
-                audioPath: result.path
-              });
-              // 发送刷新事件
-              BrowserWindow.getAllWindows()[0]?.webContents.send('task:refresh');
+            // 获取当前录音任务ID
+            const currentTaskId = recordingManager.getCurrentRecordingTaskId();
+            if (currentTaskId) {
+              // 调用录音管理器的stopTask方法，这会实际停止录音器
+              await recordingManager.stopTask(currentTaskId);
+              console.log('Stopped recording via shortcut:', currentTaskId);
               // 发送录音状态更新
               BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
-            } else {
-              console.error('Error in STOP_RECORDING:', result.error);
             }
           } catch (error) {
-            console.error('Error in STOP_RECORDING:', error);
+            console.error('Error in STOP_RECORDING shortcut:', error);
           }
         }
         break;
 
       // 快捷键触发取消录音
       case ShortcutAction.CANCEL_RECORDING:
-        if (status.isRecording) {
+        if (isRecording) {
           try {
-            // 获取当前录音任务
-            const currentTask = await TaskManager.getCurrentRecordingTask();
-            if (!currentTask) {
-              console.error('未找到当前录音任务');
-              return;
-            }
-
-            // 取消录音
-            const result = await audioRecorder.cancelRecording();
-            if (result.success) {
-              // 更新任务状态
-              await TaskManager.updateTask(currentTask.id, { status: 'backlog' });
-              // 发送刷新事件
-              BrowserWindow.getAllWindows()[0]?.webContents.send('task:refresh');
+            // 获取当前录音任务ID
+            const currentTaskId = recordingManager.getCurrentRecordingTaskId();
+            if (currentTaskId) {
+              // 调用录音管理器的cancelTask方法，这会实际停止录音器并删除文件
+              await recordingManager.cancelTask(currentTaskId);
+              console.log('Cancelled recording via shortcut:', currentTaskId);
               // 发送录音状态更新
               BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
-            } else {
-              console.error('Error in CANCEL_RECORDING:', result.error);
             }
           } catch (error) {
-            console.error('Error in CANCEL_RECORDING:', error);
+            console.error('Error in CANCEL_RECORDING shortcut:', error);
           }
         }
         break;
@@ -191,32 +180,28 @@ export class ShortcutManager {
     const existingShortcut = this.shortcuts.get(action);
     if (existingShortcut) {
       const newKey = config.key || existingShortcut.key;
-      const updatedShortcut = { ...existingShortcut, ...config, key: newKey };
-      const conflict = Array.from(this.shortcuts.entries()).find(
-        ([a, v]) => v.key === newKey && a !== action
-      );
-      if (conflict) {
-        console.log('快捷键冲突，已被其他功能占用:', newKey);
-        return;
-      }
+      
+      // 如果快捷键改变了，先注销旧的
       if (newKey !== existingShortcut.key) {
         this.unregisterShortcut(existingShortcut.key);
       }
+      
+      // 更新配置
+      const updatedShortcut = { ...existingShortcut, ...config };
       this.shortcuts.set(action, updatedShortcut);
+      
+      // 注册新的快捷键
       if (updatedShortcut.enabled) {
         this.registerShortcut(updatedShortcut);
-      } else {
-        this.unregisterShortcut(newKey);
       }
-      console.log('主进程已更新快捷键:', action, updatedShortcut);
-    } else {
-      console.log('主进程未找到快捷键:', action);
+      
+      console.log('已更新快捷键:', action, updatedShortcut);
     }
   }
 
-  // 清理资源
+  // 清理所有快捷键
   public cleanup() {
     globalShortcut.unregisterAll();
-    console.log('已注销所有全局快捷键');
+    console.log('已清理所有快捷键');
   }
 } 
