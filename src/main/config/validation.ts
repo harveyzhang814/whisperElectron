@@ -52,6 +52,70 @@ const VALIDATION_RULES: ConfigValidationRules = {
     min: 10000,
     max: 300000,
     message: '健康检查间隔应在 10-300 秒之间'
+  },
+  'transcription.defaultModel': {
+    required: true,
+    pattern: /^(tiny|base|small|medium|large)$/,
+    message: '请选择有效的转录模型：tiny, base, small, medium, large'
+  },
+  'transcription.defaultLanguage': {
+    required: false,
+    pattern: /^[a-z]{2}(-[A-Z]{2})?$/,
+    message: '语言代码格式不正确，应为 ISO 639-1 格式（如：en, zh-CN）'
+  },
+  'transcription.maxConcurrentTranscriptions': {
+    required: true,
+    min: 1,
+    max: 10,
+    message: '最大并发转录数应在 1-10 之间'
+  },
+  'transcription.autoTranscribeRecordings': {
+    required: true,
+    validator: (value) => typeof value === 'boolean',
+    message: '自动转录开关必须是布尔值'
+  },
+  'transcription.outputDirectory': {
+    required: true,
+    pattern: /^.+$/,
+    message: '输出目录不能为空'
+  },
+  'transcription.defaultOutputFormat': {
+    required: true,
+    validator: (value) => ['txt', 'json', 'srt', 'vtt'].includes(value),
+    message: '输出格式必须是：txt, json, srt, vtt'
+  },
+  'transcription.defaultTemperature': {
+    required: true,
+    min: 0.0,
+    max: 1.0,
+    message: '温度值应在 0.0-1.0 之间'
+  },
+  'transcription.enableCaching': {
+    required: true,
+    validator: (value) => typeof value === 'boolean',
+    message: '缓存开关必须是布尔值'
+  },
+  'transcription.cacheDirectory': {
+    required: true,
+    pattern: /^.+$/,
+    message: '缓存目录不能为空'
+  },
+  'transcription.maxCacheSize': {
+    required: true,
+    min: 10,
+    max: 1000,
+    message: '最大缓存大小应在 10-1000 MB 之间'
+  },
+  'transcription.enableAutoCleanup': {
+    required: true,
+    validator: (value) => typeof value === 'boolean',
+    message: '自动清理开关必须是布尔值'
+  },
+  'transcription.retentionPeriod': {
+    required: true,
+    min: 1,
+    max: 365,
+    message: '保留期应在 1-365 天之间'
   }
 };
 
@@ -138,7 +202,7 @@ export function validateConfig(config: AppConfig): ConfigValidationResult {
  * Validate configuration consistency
  */
 function validateConfigConsistency(config: AppConfig, _errors: string[], warnings: string[]): void {
-  const { whisper } = config;
+  const { whisper, transcription } = config;
 
   // Check if health check interval is reasonable compared to timeout
   if (whisper.enableHealthCheck && whisper.healthCheckInterval < whisper.timeout) {
@@ -174,6 +238,35 @@ function validateConfigConsistency(config: AppConfig, _errors: string[], warning
     if (apiConfig.outputFormat === 'text') {
       // 纯文本格式不支持复杂功能
       warnings.push('纯文本格式功能有限，建议使用 JSON 格式以获得更多信息');
+    }
+  }
+
+  // 检查转录配置一致性
+  if (transcription) {
+    // 检查模型一致性
+    if (whisper.defaultModel !== transcription.defaultModel) {
+      warnings.push('Whisper API 默认模型与转录默认模型不一致，可能导致混淆');
+    }
+
+    // 检查语言一致性
+    if (whisper.language && transcription.defaultLanguage && 
+        whisper.language !== transcription.defaultLanguage) {
+      warnings.push('Whisper API 语言与转录默认语言不一致，可能导致混淆');
+    }
+
+    // 检查并发数合理性
+    if (transcription.maxConcurrentTranscriptions > 5) {
+      warnings.push('并发转录数较多，可能影响系统性能');
+    }
+
+    // 检查缓存配置
+    if (transcription.enableCaching && transcription.maxCacheSize > 500) {
+      warnings.push('缓存大小较大，可能占用过多磁盘空间');
+    }
+
+    // 检查自动转录配置
+    if (transcription.autoTranscribeRecordings && transcription.maxConcurrentTranscriptions < 2) {
+      warnings.push('启用自动转录时，建议设置更高的并发数');
     }
   }
 }

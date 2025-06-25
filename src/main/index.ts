@@ -3,6 +3,8 @@ import path from 'path';
 import { ShortcutManager, setShortcutTaskManagers } from './shortcut';
 import { FullTaskManager } from './managers/FullTaskManager';
 import { RecordingSubTaskManager } from './managers/RecordingSubTaskManager';
+import { TranscriptionSubTaskManager } from './managers/TranscriptionSubTaskManager';
+import { ImportSubTaskManager } from './managers/ImportSubTaskManager';
 import { initializeIPC, setTaskManagers } from './ipc';
 
 let shortcutManager: ShortcutManager | null = null;
@@ -12,6 +14,8 @@ let tray: Tray | null = null;
 // 新的任务管理器实例
 let fullTaskManager: FullTaskManager | null = null;
 let recordingManager: RecordingSubTaskManager | null = null;
+let transcriptionManager: TranscriptionSubTaskManager | null = null;
+let importManager: ImportSubTaskManager | null = null;
 
 // 初始化新的任务管理系统
 async function initializeNewTaskManagerSystem() {
@@ -30,8 +34,20 @@ async function initializeNewTaskManagerSystem() {
     // 初始化RecordingSubTaskManager - 传递FullTaskManager和storage
     recordingManager = new RecordingSubTaskManager(fullTaskManager, storage);
     
+    // 初始化TranscriptionSubTaskManager - 传递FullTaskManager和storage
+    transcriptionManager = new TranscriptionSubTaskManager(fullTaskManager, storage);
+    
+    // 初始化ImportSubTaskManager - 传递FullTaskManager和storage
+    importManager = new ImportSubTaskManager(fullTaskManager, storage);
+    
     // 注册RecordingSubTaskManager到FullTaskManager
     fullTaskManager.registerSubTaskManager('RECORDING', recordingManager);
+    
+    // 注册TranscriptionSubTaskManager到FullTaskManager
+    fullTaskManager.registerSubTaskManager('TRANSCRIPTION', transcriptionManager);
+    
+    // 注册ImportSubTaskManager到FullTaskManager
+    fullTaskManager.registerSubTaskManager('IMPORT', importManager);
     
     console.log('New TaskManager system initialized successfully');
   } catch (error) {
@@ -43,9 +59,17 @@ async function initializeNewTaskManagerSystem() {
 // 清理任务管理器
 async function cleanupTaskManager() {
   try {
+    if (transcriptionManager) {
+      await transcriptionManager.cleanup();
+      transcriptionManager = null;
+    }
     if (recordingManager) {
       await recordingManager.cleanup();
       recordingManager = null;
+    }
+    if (importManager) {
+      await importManager.cleanup();
+      importManager = null;
     }
     if (fullTaskManager) {
       await fullTaskManager.close();
@@ -271,8 +295,8 @@ app.whenReady().then(async () => {
   await initializeShortcutManager();
   
   // 设置任务管理器实例到IPC处理器
-  if (fullTaskManager && recordingManager) {
-    setTaskManagers(fullTaskManager, recordingManager);
+  if (fullTaskManager && recordingManager && transcriptionManager && importManager) {
+    setTaskManagers(fullTaskManager, recordingManager, transcriptionManager, importManager);
   }
   
   // 初始化 IPC 通信

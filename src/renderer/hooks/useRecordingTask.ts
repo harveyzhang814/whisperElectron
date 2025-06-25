@@ -26,6 +26,54 @@ export const useRecordingTask = () => {
     }
   }, []);
 
+  const startRecording = useCallback(async (taskId?: string) => {
+    try {
+      const result = await window.electron.startRecording(taskId);
+      if (result.success) {
+        await loadCurrentTask();
+      } else {
+        setError(result.error || 'Failed to start recording');
+      }
+      return result;
+    } catch (err) {
+      console.error('Error starting recording:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start recording');
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  }, [loadCurrentTask]);
+
+  const stopRecording = useCallback(async (taskId?: string) => {
+    try {
+      const result = await window.electron.stopRecording(taskId);
+      if (result.success) {
+        await loadCurrentTask();
+      } else {
+        setError(result.error || 'Failed to stop recording');
+      }
+      return result;
+    } catch (err) {
+      console.error('Error stopping recording:', err);
+      setError(err instanceof Error ? err.message : 'Failed to stop recording');
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  }, [loadCurrentTask]);
+
+  const cancelRecording = useCallback(async (taskId?: string) => {
+    try {
+      const result = await window.electron.cancelRecording(taskId);
+      if (result.success) {
+        await loadCurrentTask();
+      } else {
+        setError(result.error || 'Failed to cancel recording');
+      }
+      return result;
+    } catch (err) {
+      console.error('Error canceling recording:', err);
+      setError(err instanceof Error ? err.message : 'Failed to cancel recording');
+      return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  }, [loadCurrentTask]);
+
   useEffect(() => {
     // 初始加载
     loadCurrentTask();
@@ -40,6 +88,9 @@ export const useRecordingTask = () => {
     currentTask,
     isLoading,
     error,
-    loadCurrentTask
+    loadCurrentTask,
+    startRecording,
+    stopRecording,
+    cancelRecording
   };
 }; 

@@ -52,8 +52,19 @@ contextBridge.exposeInMainWorld('electron', {
   deleteTask: (id: string) => ipcRenderer.invoke('task:delete', id),
   getCurrentRecording: () => ipcRenderer.invoke('task:getCurrentRecording'),
 
+  // Unified Task Management - 新的统一任务管理接口
+  createUnifiedTask: (options: any) => ipcRenderer.invoke('unified:create', options),
+  getUnifiedTask: (taskId: string) => ipcRenderer.invoke('unified:get', taskId),
+  getAllUnifiedTasks: () => ipcRenderer.invoke('unified:getAll'),
+  updateUnifiedTask: (taskId: string, updates: any) => ipcRenderer.invoke('unified:update', taskId, updates),
+  deleteUnifiedTask: (taskId: string) => ipcRenderer.invoke('unified:delete', taskId),
+  startTaskStage: (taskId: string, stage: 'AUDIO_SOURCE' | 'TRANSCRIPTION') => ipcRenderer.invoke('unified:startStage', taskId, stage),
+  stopTaskStage: (taskId: string, stage: 'AUDIO_SOURCE' | 'TRANSCRIPTION') => ipcRenderer.invoke('unified:stopStage', taskId, stage),
+  cancelTaskStage: (taskId: string, stage: 'AUDIO_SOURCE' | 'TRANSCRIPTION') => ipcRenderer.invoke('unified:cancelStage', taskId, stage),
+
   // Task refresh event
   onTaskRefresh: (callback: () => void) => ipcRenderer.on('task:refresh', callback),
+  removeTaskRefreshListener: () => ipcRenderer.removeAllListeners('task:refresh'),
 
   // Whisper 配置相关
   getWhisperConfig: () => ipcRenderer.invoke('config:getWhisper'),
@@ -84,4 +95,28 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.removeAllListeners('whisper:error');
   },
   openAudioFile: (audioPath: string) => ipcRenderer.invoke('audio:openFile', audioPath),
+
+  // Transcription Task related - 新增转录任务接口
+  startTranscription: (taskId: string, audioFilePath: string, options?: any) => 
+    ipcRenderer.invoke('transcription:start', taskId, audioFilePath, options),
+  cancelTranscription: (taskId: string) => ipcRenderer.invoke('transcription:cancel', taskId),
+  getTranscriptionStatus: () => ipcRenderer.invoke('transcription:getStatus'),
+  getTranscriptionTask: (taskId: string) => ipcRenderer.invoke('transcription:getTask', taskId),
+  getAllTranscriptionTasks: () => ipcRenderer.invoke('transcription:getAll'),
+  
+  // Transcription 事件监听
+  onTranscriptionProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('transcription:progress', (_event, progress) => callback(progress));
+  },
+  onTranscriptionComplete: (callback: (result: any) => void) => {
+    ipcRenderer.on('transcription:complete', (_event, result) => callback(result));
+  },
+  onTranscriptionError: (callback: (error: any) => void) => {
+    ipcRenderer.on('transcription:error', (_event, error) => callback(error));
+  },
+  removeTranscriptionListeners: () => {
+    ipcRenderer.removeAllListeners('transcription:progress');
+    ipcRenderer.removeAllListeners('transcription:complete');
+    ipcRenderer.removeAllListeners('transcription:error');
+  },
 }); 

@@ -70,6 +70,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed IPC routing issues by updating audio.ts handlers to support both old and new TaskManager systems
   - Implemented conditional routing based on USE_NEW_TASK_MANAGER environment variable
 
+- **Whisper Transcription Integration - Phase 4**: Complete IPC interface extension and frontend integration
+  - Extended IPC handlers in `src/main/ipc.ts` with comprehensive transcription task management
+    - `transcription:start` - Start transcription for a recording task
+    - `transcription:cancel` - Cancel active transcription task
+    - `transcription:getStatus` - Get current transcription status
+    - `transcription:getTask` - Get specific transcription task details
+    - `transcription:getAll` - Get all transcription tasks
+  - Updated preload script (`src/preload.ts`) with transcription task interfaces
+    - Added transcription task management methods
+    - Added transcription event listeners for progress, completion, and errors
+    - Integrated with existing electron API structure
+  - Enhanced type definitions (`src/renderer/types/electron.d.ts`)
+    - Added `TranscriptionResult`, `TranscriptionStatus`, `TranscriptionTask` interfaces
+    - Extended `ElectronAPI` interface with transcription methods
+    - Maintained type safety across transcription workflow
+  - Created comprehensive TranscriptionTask React component (`src/renderer/components/TranscriptionTask.tsx`)
+    - Real-time transcription status monitoring and display
+    - Progress tracking with visual progress bar
+    - Error handling and retry mechanism support
+    - Transcription result display with metadata
+    - Responsive design with mobile-friendly layout
+  - Added TranscriptionTask component styles (`src/renderer/components/TranscriptionTask.css`)
+    - Modern, clean UI design matching application theme
+    - Status indicators with color-coded states
+    - Progress visualization with animated progress bars
+    - Error message styling with dismissible alerts
+    - Responsive design for different screen sizes
+  - Integrated transcription functionality into main application (`src/renderer/App.tsx`)
+    - Added transcription panel with show/hide functionality
+    - Integrated with existing recording task workflow
+    - Added transcription completion and error handling callbacks
+    - Maintained application layout consistency
+  - Updated application layout (`src/renderer/App.css`)
+    - Added transcription panel layout with proper positioning
+    - Implemented responsive design for transcription panel
+    - Maintained existing application styling consistency
+    - Added close button and panel header styling
+
+- **Whisper Transcription Integration - Phase 5**: TaskList transcription integration and modal interface
+  - Created TranscriptionModal component (`src/renderer/components/TranscriptionModal.tsx`)
+    - Modal dialog wrapper for transcription functionality
+    - Integrated TranscriptionTask component with modal interface
+    - Added task name display and close functionality
+    - Implemented proper event handling and callback forwarding
+  - Added TranscriptionModal styles (`src/renderer/components/TranscriptionModal.css`)
+    - Modern modal design with backdrop blur effect
+    - Responsive layout for different screen sizes
+    - Proper z-index management and accessibility features
+    - Dark theme support and hover effects
+  - Enhanced TaskList component (`src/renderer/components/TaskList.tsx`)
+    - Added transcribe button for completed recording tasks
+    - Implemented conditional button display logic (only for completed recording tasks)
+    - Added transcription modal state management
+    - Integrated audio file path detection from task metadata
+    - Added transcription completion and error handling
+  - Updated TaskList button styles (`src/renderer/App.css`)
+    - Added transcribe button styling with green color scheme
+    - Implemented hover effects and visual feedback
+    - Maintained consistency with existing button design
+  - Fixed TypeScript compilation issues
+    - Removed unused imports in TranscriptionSubTaskManager
+    - Fixed parameter naming in onStopTask method
+    - Cleaned up transcription type definitions
+
+### Removed
+- **Toolbar Transcription Button**: Removed transcription button from main toolbar
+  - Removed transcribe button from toolbar settings buttons group
+  - Removed transcription panel and related UI components from main application
+  - Removed transcription panel CSS styles from App.css
+  - Removed transcription-related state management and handlers from App.tsx
+  - Removed TranscriptionTask component import from App.tsx
+  - Simplified application layout by removing transcription panel
+  - Transcription functionality will be integrated into individual task items in TaskList (planned for next phase)
+
 ### Changed
 - **Request Handling**: Unified all API requests to use form-data submit method
   - Replaced fetch-based requests with form-data for consistency

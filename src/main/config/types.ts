@@ -27,11 +27,43 @@ export interface WhisperAPIConfig {
 }
 
 /**
+ * Transcription task configuration
+ */
+export interface TranscriptionConfig {
+  /** Default model for transcription tasks */
+  defaultModel: string;
+  /** Default language for transcription (empty for auto-detection) */
+  defaultLanguage?: string;
+  /** Maximum number of concurrent transcription tasks */
+  maxConcurrentTranscriptions: number;
+  /** Whether to automatically transcribe recordings after completion */
+  autoTranscribeRecordings: boolean;
+  /** Output directory for transcription results */
+  outputDirectory: string;
+  /** Default output format for transcription results */
+  defaultOutputFormat: 'txt' | 'json' | 'srt' | 'vtt';
+  /** Default temperature for transcription */
+  defaultTemperature: number;
+  /** Enable transcription result caching */
+  enableCaching: boolean;
+  /** Cache directory for transcription results */
+  cacheDirectory: string;
+  /** Maximum cache size in MB */
+  maxCacheSize: number;
+  /** Enable automatic cleanup of old transcription results */
+  enableAutoCleanup: boolean;
+  /** Retention period for transcription results in days */
+  retentionPeriod: number;
+}
+
+/**
  * Main application configuration structure
  */
 export interface AppConfig {
   /** Whisper API configuration */
   whisper: WhisperAPIConfig;
+  /** Transcription task configuration */
+  transcription: TranscriptionConfig;
 }
 
 /**

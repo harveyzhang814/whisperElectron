@@ -3,73 +3,101 @@ import { ShortcutSettings } from './components/ShortcutSettings';
 import { ApiSettings } from './components/ApiSettings';
 import { WhisperTest } from './components/WhisperTest';
 import { TaskList } from './components/TaskList';
-import { useRecordingTask } from './hooks/useRecordingTask';
+import { useTasks } from './hooks/useTasks';
 import './App.css';
 
 type SettingsType = 'shortcuts' | 'api' | 'test' | null;
 
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState<SettingsType>(null);
-  const { currentTask } = useRecordingTask();
+  const { tasks, createTask, loadTasks } = useTasks();
+  const [currentTask, setCurrentTask] = useState<any>(null);
 
   useEffect(() => {
-    // 监听托盘菜单事件
-    window.electron.onRecordingStart(() => {
-      handleStartRecording();
-    });
-    window.electron.onRecordingStop(() => {
-      handleStopRecording();
-    });
-    window.electron.onRecordingCancel(() => {
-      handleCancelRecording();
-    });
-
+    // 只注册一次事件监听器，负责刷新 tasks
+    window.electron.onTaskRefresh(loadTasks);
     return () => {
-      // 清理事件监听
-      window.electron.removeTrayListeners();
+      window.electron.removeTaskRefreshListener();
     };
-  }, []);
+  }, [loadTasks]);
+
+  useEffect(() => {
+    // 每次 tasks 变化都刷新 currentTask
+    console.log('[App] updateCurrent, tasks:', tasks.map(t => ({
+      id: t.id,
+      audioSourceState: t.stages?.AUDIO_SOURCE?.state
+    })));
+    const running = tasks.find(
+      t => t.stages?.AUDIO_SOURCE?.state === 'IN_PROGRESS'
+    );
+    setCurrentTask(running || null);
+    console.log('[App] setCurrentTask:', running);
+  }, [tasks]);
 
   const handleQuit = async () => {
     await window.electron.quitApp();
   };
 
+  // 新建并自动启动录音
   const handleStartRecording = async () => {
     try {
-      const result = await window.electron.startRecording();
-      if (!result.success) {
-        console.error('Failed to start recording:', result.error);
+      console.log('🎯 [App] Starting recording process...');
+      
+      // 不传递任何参数，后端会自动生成默认值
+      console.log('📝 [App] Creating task without parameters...');
+      const task = await createTask();
+      
+      console.log('✅ [App] Task created:', {
+        id: task?.id,
+        name: task?.metadata?.name,
+        state: task?.state,
+        stages: task?.stages
+      });
+      
+      if (task && task.id) {
+        console.log('🚀 [App] Starting AUDIO_SOURCE stage for task:', task.id);
+        await window.electron.startTaskStage(task.id, 'AUDIO_SOURCE');
+        console.log('✅ [App] AUDIO_SOURCE stage started successfully');
+        
+        console.log('🔄 [App] Reloading tasks...');
+        await loadTasks();
+        console.log('✅ [App] Tasks reloaded');
+      } else {
+        console.error('❌ [App] Failed to create task or task has no ID');
       }
     } catch (error) {
-      console.error('Error starting recording:', error);
+      console.error('❌ [App] Error starting unified recording:', error);
     }
   };
 
   const handleStopRecording = async () => {
     try {
-      const result = await window.electron.stopRecording();
-      if (!result.success) {
-        console.error('Failed to stop recording:', result.error);
+      if (currentTask && currentTask.id) {
+        await window.electron.stopTaskStage(currentTask.id, 'AUDIO_SOURCE');
+        await loadTasks();
       }
     } catch (error) {
-      console.error('Error stopping recording:', error);
+      console.error('Error stopping unified recording:', error);
     }
   };
 
   const handleCancelRecording = async () => {
     try {
-      const result = await window.electron.cancelRecording();
-      if (!result.success) {
-        console.error('Failed to cancel recording:', result.error);
+      if (currentTask && currentTask.id) {
+        await window.electron.cancelTaskStage(currentTask.id, 'AUDIO_SOURCE');
+        await loadTasks();
       }
     } catch (error) {
-      console.error('Error canceling recording:', error);
+      console.error('Error canceling unified recording:', error);
     }
   };
 
   const getStatusText = () => {
     if (currentTask) {
-      return 'Recording...';
+      const audioSourceStage = currentTask.stages?.AUDIO_SOURCE;
+      if (audioSourceStage?.state === 'IN_PROGRESS') {
+        return 'Recording...';
+      }
     }
     return 'Ready to record';
   };
@@ -81,7 +109,7 @@ const App: React.FC = () => {
         <div className="panel-section toolbar-section">
       <header className="toolbar">
         <div className="recording-controls">
-          {!currentTask ? (
+          {!currentTask || currentTask.stages?.AUDIO_SOURCE?.state !== 'IN_PROGRESS' ? (
             <button 
               className="record-button"
               onClick={handleStartRecording}
@@ -154,6 +182,7 @@ const App: React.FC = () => {
       </main>
         </div>
       </div>
+
       {/* Settings Modals */}
       {showSettings === 'shortcuts' && (
         <ShortcutSettings onClose={() => setShowSettings(null)} />

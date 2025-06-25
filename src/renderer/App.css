@@ -13,10 +13,19 @@ html, body {
 /* 应用的主容器，使用弹性布局垂直排列 */
 .app {
   display: flex; /* 使用弹性布局 */
-  flex-direction: column; /* 垂直排列子元素 */
+  flex-direction: row; /* 水平排列子元素 */
   height: 100vh; /* 占满视口高度 */
   background-color: var(--background-color); /* 使用CSS变量设置背景色 */
   overflow-x: hidden; /* 隐藏水平滚动条 */
+}
+
+/* ===== 主面板 ===== */
+/* 主内容区域，包含工具栏和任务列表 */
+.main-panel {
+  display: flex; /* 使用弹性布局 */
+  flex-direction: column;
+  flex: 1;
+  min-width: 0; /* 允许面板收缩 */
 }
 
 /* ===== 工具栏组件 ===== */
@@ -371,6 +380,18 @@ html, body {
   border-color: var(--text-secondary); /* 悬停时的边框色 */
 }
 
+/* 转录按钮样式 */
+.task-button.transcribe {
+  background-color: #10b981; /* 绿色背景 */
+  color: white; /* 白色文字 */
+  border: none; /* 无边框 */
+}
+
+/* 转录按钮的悬停效果 */
+.task-button.transcribe:hover {
+  background-color: #059669; /* 悬停时的深绿色背景 */
+}
+
 /* 删除按钮样式 */
 .task-button.delete {
   background-color: #ef4444; /* 红色背景 */
@@ -467,63 +488,11 @@ html, body {
   .tag-unknown   { background: #374151; color: #f3f4f6; }
 }
 
-/* ===== macOS风格面板布局 ===== */
-/* 主面板容器 */
-.main-panel {
-  display: flex; /* 使用弹性布局 */
-  flex-direction: column; /* 垂直排列 */
-  align-items: stretch; /* 拉伸对齐 */
-  justify-content: flex-start; /* 顶部对齐 */
-  min-height: 98vh; /* 最小高度98%视口高度 */
-  background: var(--background-color); /* 使用CSS变量设置背景色 */
-  padding: 32px 15px; /* 上下32px，左右15px的内边距 */
-  gap: 24px; /* 子元素之间的间距 */
-  box-sizing: border-box; /* 盒模型包含边框和内边距 */
-}
-
-/* 面板区域 */
-.panel-section {
-  width: 100%; /* 占满容器宽度 */
-  max-width: 1600px; /* 最大宽度1600px */
-  background: var(--toolbar-background); /* 使用CSS变量设置背景色 */
-  border-radius: 18px; /* 18px圆角 */
-  box-shadow: 0 2px 16px rgba(0,0,0,0.07); /* 阴影效果 */
-  border: 1px solid var(--border-color); /* 1px实线边框 */
-  margin: 0 auto; /* 水平居中 */
-  padding: 0; /* 无内边距 */
-  overflow: hidden; /* 隐藏溢出内容 */
-  display: flex; /* 使用弹性布局 */
-  flex-direction: column; /* 垂直排列 */
-  box-sizing: border-box; /* 盒模型包含边框和内边距 */
-}
-
-/* 工具栏区域 */
-.toolbar-section {
-  position: sticky; /* 粘性定位 */
-  top: 0; /* 顶部对齐 */
-  z-index: 10; /* 层级10 */
-  background: var(--toolbar-background); /* 使用CSS变量设置背景色 */
-  border-radius: 18px; /* 18px圆角 */
-  box-shadow: 0 2px 16px rgba(0,0,0,0.07); /* 阴影效果 */
-  border: 1px solid var(--border-color); /* 1px实线边框 */
-  margin: 0 auto 0 auto; /* 水平居中，无上下外边距 */
-}
-
-/* 任务列表区域 */
-.tasklist-section {
-  margin-top: 0; /* 无顶部外边距 */
-  border-radius: 18px; /* 18px圆角 */
-  border-top: 1px solid var(--border-color); /* 顶部1px实线边框 */
-  flex: 1; /* 占据剩余空间 */
-  min-height: 400px; /* 最小高度400px */
-}
-
 /* ===== 响应式设计 ===== */
 /* 小屏幕适配 */
 @media (max-width: 1200px) {
-  .panel-section {
-    max-width: 100vw; /* 最大宽度100%视口宽度 */
-    width: 100%; /* 占满容器宽度 */
+  .app {
+    flex-direction: column;
   }
 }
 
@@ -547,4 +516,173 @@ button {
   white-space: nowrap; /* 不换行 */
   overflow: hidden; /* 隐藏溢出内容 */
   text-overflow: ellipsis; /* 文字溢出显示省略号 */
+}
+
+/* ===== 任务阶段显示样式 ===== */
+/* 任务阶段信息容器 */
+.task-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: var(--background-color);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+/* 单个阶段信息 */
+.stage-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* 阶段标签 */
+.stage-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 3rem;
+}
+
+/* 阶段状态 */
+.stage-state {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 阶段进度 */
+.stage-progress {
+  margin-left: auto;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.125rem 0.375rem;
+  border-radius: 2px;
+  font-size: 0.625rem;
+}
+
+/* 阶段状态颜色 */
+.stage-info.state-pending {
+  background-color: rgba(107, 114, 128, 0.1);
+  border-left: 3px solid #6b7280;
+}
+
+.stage-info.state-running {
+  background-color: rgba(37, 99, 235, 0.1);
+  border-left: 3px solid #2563eb;
+}
+
+.stage-info.state-completed {
+  background-color: rgba(5, 150, 105, 0.1);
+  border-left: 3px solid #059669;
+}
+
+.stage-info.state-cancelled {
+  background-color: rgba(180, 83, 9, 0.1);
+  border-left: 3px solid #b45309;
+}
+
+.stage-info.state-failed {
+  background-color: rgba(220, 38, 38, 0.1);
+  border-left: 3px solid #dc2626;
+}
+
+/* 任务类型标签 */
+.task-type {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.125rem 0.375rem;
+  border-radius: 2px;
+  margin-left: 0.5rem;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .task-stages {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-color);
+  }
+  
+  .stage-info {
+    background-color: rgba(255, 255, 255, 0.02);
+  }
+  
+  .stage-progress {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .task-type {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .stage-info.state-pending {
+    background-color: rgba(107, 114, 128, 0.2);
+  }
+  
+  .stage-info.state-running {
+    background-color: rgba(37, 99, 235, 0.2);
+  }
+  
+  .stage-info.state-completed {
+    background-color: rgba(5, 150, 105, 0.2);
+  }
+  
+  .stage-info.state-cancelled {
+    background-color: rgba(180, 83, 9, 0.2);
+  }
+  
+  .stage-info.state-failed {
+    background-color: rgba(220, 38, 38, 0.2);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .task-stages {
+    padding: 0.375rem;
+  }
+  
+  .stage-info {
+    padding: 0.1875rem 0.375rem;
+    font-size: 0.6875rem;
+  }
+  
+  .stage-label {
+    min-width: 2.5rem;
+  }
+  
+  .stage-progress {
+    font-size: 0.5625rem;
+    padding: 0.0625rem 0.25rem;
+  }
+  
+  .task-type {
+    font-size: 0.6875rem;
+    padding: 0.0625rem 0.25rem;
+  }
+}
+
+.tag-pending   { background: #f3f4f6; color: #6b7280; }
+.tag-created   { background: #f3f4f6; color: #6b7280; }
+.tag-running   { background: #dbeafe; color: #2563eb; }
+.tag-completed { background: #d1fae5; color: #059669; }
+.tag-cancelled { background: #fef3c7; color: #b45309; }
+.tag-failed    { background: #fee2e2; color: #dc2626; }
+.tag-unknown   { background: #e5e7eb; color: #374151; }
+
+@media (prefers-color-scheme: dark) {
+  .tag-pending   { background: #374151; color: #9ca3af; }
+  .tag-created   { background: #374151; color: #9ca3af; }
+  .tag-running   { background: #1e40af; color: #dbeafe; }
+  .tag-completed { background: #065f46; color: #d1fae5; }
+  .tag-cancelled { background: #78350f; color: #fde68a; }
+  .tag-failed    { background: #7f1d1d; color: #fecaca; }
+  .tag-unknown   { background: #374151; color: #f3f4f6; }
 } 

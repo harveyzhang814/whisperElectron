@@ -1,19 +1,17 @@
 import { EventEmitter } from 'events';
 import {
-  BaseTask,
-  TaskState,
+  TaskStage,
+  StageState,
   TaskEvent,
   TaskEventType,
-  TaskStateChangedEvent,
-  TaskProgressUpdatedEvent,
-  TaskErrorEvent
+  TaskErrorEvent,
+  StageStateChangedEvent,
+  StageProgressUpdatedEvent,
+  UnifiedTask
 } from '../types/task';
 import { TaskStorageInterface } from '../types/storage';
 
-/**
- * Options for creating a subtask
- */
-export interface SubTaskOptions {
+export interface SubTaskStageOptions {
   name: string;
   description?: string;
   tags?: string[];
@@ -22,19 +20,19 @@ export interface SubTaskOptions {
 
 /**
  * Base class for all subtask managers.
- * Provides common functionality and enforces consistent interface.
+ * Provides common functionality for managing task stages in the unified architecture.
  */
-export abstract class BaseSubTaskManager<T extends BaseTask = BaseTask> {
+export abstract class BaseSubTaskManager {
   protected taskManager: EventEmitter;
-  protected type: string;
-  protected tasks: Map<string, T>;
+  protected stage: TaskStage;
+  protected managedTasks: Map<string, UnifiedTask>;
   protected initialized: boolean = false;
   protected storage: TaskStorageInterface;
 
-  constructor(taskManager: EventEmitter, type: string, storage: TaskStorageInterface) {
+  constructor(taskManager: EventEmitter, stage: TaskStage, storage: TaskStorageInterface) {
     this.taskManager = taskManager;
-    this.type = type;
-    this.tasks = new Map();
+    this.stage = stage;
+    this.managedTasks = new Map();
     this.storage = storage;
   }
 
@@ -73,273 +71,313 @@ export abstract class BaseSubTaskManager<T extends BaseTask = BaseTask> {
   }
 
   /**
-   * Create a new subtask
+   * Initialize a task stage
    */
-  public async createTask(taskId: string, options: SubTaskOptions): Promise<T> {
+  public async initializeTaskStage(taskId: string, options: SubTaskStageOptions): Promise<void> {
     this.ensureInitialized();
 
     try {
-      const task = await this.onCreateTask(taskId, options);
-      this.tasks.set(taskId, task);
-      return task;
+      const task = await this.getTaskOrThrow(taskId);
+      await this.onInitializeTaskStage(task, options);
+      await this.updateStageState(taskId, StageState.PENDING);
     } catch (error) {
-      await this.handleError('createTask', error);
+      await this.handleError('initializeTaskStage', error);
       throw error;
     }
   }
 
   /**
-   * Start a task
+   * Start a task stage
    */
-  public async startTask(taskId: string): Promise<void> {
+  public async startTaskStage(taskId: string): Promise<void> {
     this.ensureInitialized();
     const task = this.getTaskOrThrow(taskId);
 
     try {
-      if (!this.validateStateTransition(task.state, TaskState.RUNNING)) {
-        throw new Error(`Invalid state transition from ${task.state} to ${TaskState.RUNNING}`);
+      if (!this.validateStageStateTransition(task.stages[this.stage].state, StageState.IN_PROGRESS)) {
+        throw new Error(`Invalid stage state transition from ${task.stages[this.stage].state} to ${StageState.IN_PROGRESS}`);
       }
 
-      await this.onStartTask(task);
-      await this.updateTaskState(taskId, TaskState.RUNNING);
+      await this.onStartTaskStage(task);
+      await this.updateStageState(taskId, StageState.IN_PROGRESS);
     } catch (error) {
-      await this.handleError('startTask', error);
+      await this.handleError('startTaskStage', error);
       throw error;
     }
   }
 
   /**
-   * Pause a task
+   * Pause a task stage
    */
-  public async pauseTask(taskId: string): Promise<void> {
+  public async pauseTaskStage(taskId: string): Promise<void> {
     this.ensureInitialized();
     const task = this.getTaskOrThrow(taskId);
 
     try {
-      if (!this.validateStateTransition(task.state, TaskState.PAUSED)) {
-        throw new Error(`Invalid state transition from ${task.state} to ${TaskState.PAUSED}`);
+      if (!this.validateStageStateTransition(task.stages[this.stage].state, StageState.IN_PROGRESS)) {
+        throw new Error(`Invalid stage state transition from ${task.stages[this.stage].state} to ${StageState.IN_PROGRESS}`);
       }
 
-      await this.onPauseTask(task);
-      await this.updateTaskState(taskId, TaskState.PAUSED);
+      await this.onPauseTaskStage(task);
+      // Note: We keep the stage in IN_PROGRESS state when paused
     } catch (error) {
-      await this.handleError('pauseTask', error);
+      await this.handleError('pauseTaskStage', error);
       throw error;
     }
   }
 
   /**
-   * Resume a task
+   * Resume a task stage
    */
-  public async resumeTask(taskId: string): Promise<void> {
+  public async resumeTaskStage(taskId: string): Promise<void> {
     this.ensureInitialized();
     const task = this.getTaskOrThrow(taskId);
 
     try {
-      if (!this.validateStateTransition(task.state, TaskState.RUNNING)) {
-        throw new Error(`Invalid state transition from ${task.state} to ${TaskState.RUNNING}`);
+      await this.onResumeTaskStage(task);
+      // Stage remains in IN_PROGRESS state
+    } catch (error) {
+      await this.handleError('resumeTaskStage', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Complete a task stage
+   */
+  public async completeTaskStage(taskId: string): Promise<void> {
+    this.ensureInitialized();
+    const task = this.getTaskOrThrow(taskId);
+
+    try {
+      if (!this.validateStageStateTransition(task.stages[this.stage].state, StageState.COMPLETED)) {
+        throw new Error(`Invalid stage state transition from ${task.stages[this.stage].state} to ${StageState.COMPLETED}`);
       }
 
-      await this.onResumeTask(task);
-      await this.updateTaskState(taskId, TaskState.RUNNING);
+      await this.onCompleteTaskStage(task);
+      await this.updateStageState(taskId, StageState.COMPLETED);
     } catch (error) {
-      await this.handleError('resumeTask', error);
+      await this.handleError('completeTaskStage', error);
       throw error;
     }
   }
 
   /**
-   * Stop a task
+   * Fail a task stage
    */
-  public async stopTask(taskId: string): Promise<void> {
+  public async failTaskStage(taskId: string, error?: Error): Promise<void> {
     this.ensureInitialized();
     const task = this.getTaskOrThrow(taskId);
 
     try {
-      if (!this.validateStateTransition(task.state, TaskState.COMPLETED)) {
-        throw new Error(`Invalid state transition from ${task.state} to ${TaskState.COMPLETED}`);
+      if (!this.validateStageStateTransition(task.stages[this.stage].state, StageState.FAILED)) {
+        throw new Error(`Invalid stage state transition from ${task.stages[this.stage].state} to ${StageState.FAILED}`);
       }
 
-      await this.onStopTask(task);
-      await this.updateTaskState(taskId, TaskState.COMPLETED);
-    } catch (error) {
-      await this.handleError('stopTask', error);
-      throw error;
+      await this.onFailTaskStage(task, error);
+      await this.updateStageState(taskId, StageState.FAILED, error);
+    } catch (err) {
+      await this.handleError('failTaskStage', err);
+      throw err;
     }
   }
 
   /**
-   * Cancel a task
+   * Cancel a task stage
    */
-  public async cancelTask(taskId: string): Promise<void> {
+  public async cancelTaskStage(taskId: string): Promise<void> {
     this.ensureInitialized();
     const task = this.getTaskOrThrow(taskId);
 
     try {
-      if (!this.validateStateTransition(task.state, TaskState.CANCELLED)) {
-        throw new Error(`Invalid state transition from ${task.state} to ${TaskState.CANCELLED}`);
-      }
-
-      await this.onCancelTask(task);
-      await this.updateTaskState(taskId, TaskState.CANCELLED);
+      await this.onCancelTaskStage(task);
+      await this.updateStageState(taskId, StageState.FAILED);
     } catch (error) {
-      await this.handleError('cancelTask', error);
+      await this.handleError('cancelTaskStage', error);
       throw error;
     }
   }
 
   /**
-   * Delete a task
+   * Get a managed task
    */
-  public async deleteTask(taskId: string): Promise<void> {
-    this.ensureInitialized();
+  public getManagedTask(taskId: string): UnifiedTask | undefined {
+    return this.managedTasks.get(taskId);
+  }
+
+  /**
+   * Get all managed tasks
+   */
+  public getManagedTasks(): UnifiedTask[] {
+    return Array.from(this.managedTasks.values());
+  }
+
+  /**
+   * Get the stage this manager handles
+   */
+  public getStage(): TaskStage {
+    return this.stage;
+  }
+
+  /**
+   * Update stage progress
+   */
+  protected async updateStageProgress(taskId: string, progress: number, detail?: string): Promise<void> {
     const task = this.getTaskOrThrow(taskId);
-
-    try {
-      await this.onDeleteTask(task);
-      this.tasks.delete(taskId);
-      await this.emitTaskEvent({
-        type: TaskEventType.TASK_DELETED,
-        taskId,
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      await this.handleError('deleteTask', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get task by ID
-   */
-  public getTask(taskId: string): T | undefined {
-    return this.tasks.get(taskId);
-  }
-
-  /**
-   * Get all tasks managed by this manager
-   */
-  public getTasks(): T[] {
-    return Array.from(this.tasks.values());
-  }
-
-  /**
-   * Get task type
-   */
-  public getType(): string {
-    return this.type;
-  }
-
-  /**
-   * Update task progress
-   */
-  protected async updateTaskProgress(taskId: string, progress: number, detail?: string): Promise<void> {
-    const task = this.getTaskOrThrow(taskId);
-    task.progress = Math.max(0, Math.min(100, progress));
+    
+    task.stages[this.stage].progress = progress;
     task.metadata.updatedAt = Date.now();
 
-    await this.emitTaskEvent({
-      type: TaskEventType.PROGRESS_UPDATED,
+    // Emit stage progress event
+    const event: StageProgressUpdatedEvent = {
+      type: TaskEventType.STAGE_PROGRESS_UPDATED,
       taskId,
       timestamp: Date.now(),
-      progress: task.progress,
+      stage: this.stage,
+      progress,
       detail
-    } as TaskProgressUpdatedEvent);
-  }
-
-  /**
-   * Update task state
-   */
-  public async updateTaskState(taskId: string, newState: TaskState): Promise<void> {
-    const task = this.getTaskOrThrow(taskId);
-    const previousState = task.state;
-    task.state = newState;
-    task.metadata.updatedAt = Date.now();
-
-    // Save the complete task data including extended fields
-    // For recording tasks, this will include recordingMetadata, config, recordingState, etc.
-    await this.storage.saveTask(task as any);
-
-    await this.emitTaskEvent({
-      type: TaskEventType.STATE_CHANGED,
-      taskId,
-      timestamp: Date.now(),
-      previousState,
-      newState
-    } as TaskStateChangedEvent);
-
-    await this.handleTaskStateChange(taskId, newState);
-  }
-
-  // Abstract methods that must be implemented by subclasses
-  protected abstract onInitialize(): Promise<void>;
-  protected abstract onCleanup(): Promise<void>;
-  protected abstract onCreateTask(taskId: string, options: SubTaskOptions): Promise<T>;
-  protected abstract onStartTask(task: T): Promise<void>;
-  protected abstract onPauseTask(task: T): Promise<void>;
-  protected abstract onResumeTask(task: T): Promise<void>;
-  protected abstract onStopTask(task: T): Promise<void>;
-  protected abstract onDeleteTask(task: T): Promise<void>;
-  protected abstract handleTaskStateChange(taskId: string, newState: TaskState): Promise<void>;
-  protected abstract onCancelTask(task: T): Promise<void>;
-
-  // Protected utility methods
-  protected validateStateTransition(currentState: TaskState, newState: TaskState): boolean {
-    const validTransitions: Record<TaskState, TaskState[]> = {
-      [TaskState.CREATED]: [TaskState.INITIALIZING, TaskState.RUNNING, TaskState.CANCELLED],
-      [TaskState.INITIALIZING]: [TaskState.RUNNING, TaskState.FAILED, TaskState.CANCELLED],
-      [TaskState.RUNNING]: [TaskState.PAUSED, TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED],
-      [TaskState.PAUSED]: [TaskState.RUNNING, TaskState.CANCELLED],
-      [TaskState.COMPLETED]: [],
-      [TaskState.FAILED]: [TaskState.INITIALIZING, TaskState.RUNNING],
-      [TaskState.CANCELLED]: [TaskState.INITIALIZING, TaskState.RUNNING]
     };
 
-    return validTransitions[currentState]?.includes(newState) ?? false;
+    await this.emitTaskEvent(event);
+    await this.storage.saveTask(task);
   }
 
-  protected isTaskInFinalState(state: TaskState): boolean {
-    return [
-      TaskState.COMPLETED,
-      TaskState.FAILED,
-      TaskState.CANCELLED
-    ].includes(state);
+  /**
+   * Update stage state
+   */
+  public async updateStageState(taskId: string, newState: StageState, error?: Error): Promise<void> {
+    const task = this.getTaskOrThrow(taskId);
+    const previousState = task.stages[this.stage].state;
+    
+    task.stages[this.stage].state = newState;
+    task.stages[this.stage].error = error;
+    
+    if (newState === StageState.IN_PROGRESS && !task.stages[this.stage].startTime) {
+      task.stages[this.stage].startTime = Date.now();
+    } else if (newState === StageState.COMPLETED || newState === StageState.FAILED) {
+      task.stages[this.stage].endTime = Date.now();
+    }
+    
+    task.metadata.updatedAt = Date.now();
+
+    // Emit stage state change event
+    const event: StageStateChangedEvent = {
+      type: TaskEventType.STAGE_STATE_CHANGED,
+      taskId,
+      timestamp: Date.now(),
+      stage: this.stage,
+      previousState,
+      newState
+    };
+
+    await this.emitTaskEvent(event);
+    await this.handleStageStateChange(taskId, newState);
+    await this.storage.saveTask(task);
   }
 
+  /**
+   * Validate stage state transition
+   */
+  protected validateStageStateTransition(currentState: StageState, newState: StageState): boolean {
+    // Define valid state transitions
+    const validTransitions: Record<StageState, StageState[]> = {
+      [StageState.PENDING]: [StageState.IN_PROGRESS, StageState.SKIPPED, StageState.CANCELLED],
+      [StageState.IN_PROGRESS]: [StageState.COMPLETED, StageState.FAILED, StageState.PENDING, StageState.CANCELLED],
+      [StageState.COMPLETED]: [], // Final state
+      [StageState.FAILED]: [StageState.PENDING, StageState.CANCELLED], // Can retry or cancel
+      [StageState.SKIPPED]: [], // Final state
+      [StageState.CANCELLED]: [StageState.IN_PROGRESS] // Can restart
+    };
+
+    return validTransitions[currentState]?.includes(newState) || false;
+  }
+
+  /**
+   * Check if stage is in final state
+   */
+  protected isStageInFinalState(state: StageState): boolean {
+    return state === StageState.COMPLETED || state === StageState.FAILED || state === StageState.SKIPPED;
+  }
+
+  /**
+   * Handle errors
+   */
   protected async handleError(operation: string, error: any): Promise<void> {
-    console.error(`Error in ${this.type} manager during ${operation}:`, error);
-
     const taskId = this.extractTaskIdFromError(error);
+    
+    console.error(`Error in ${this.stage} manager during ${operation}:`, error);
+    
     if (taskId) {
-      await this.emitTaskEvent({
+      const event: TaskErrorEvent = {
         type: TaskEventType.ERROR_OCCURRED,
         taskId,
         timestamp: Date.now(),
-        error: error instanceof Error ? error : new Error(String(error))
-      } as TaskErrorEvent);
+        error: error instanceof Error ? error : new Error(String(error)),
+        errorCode: operation
+      };
+      
+      await this.emitTaskEvent(event);
     }
   }
 
+  /**
+   * Extract task ID from error
+   */
   protected extractTaskIdFromError(_error: any): string | undefined {
-    // Subclasses can override this to provide better error handling
+    // Override in subclasses if needed
     return undefined;
   }
 
+  /**
+   * Emit task event
+   */
   protected async emitTaskEvent(event: TaskEvent): Promise<void> {
     this.taskManager.emit('taskEvent', event);
   }
 
-  private ensureInitialized(): void {
-    if (!this.initialized) {
-      throw new Error(`${this.type} manager is not initialized`);
-    }
-  }
-
-  private getTaskOrThrow(taskId: string): T {
-    const task = this.tasks.get(taskId);
+  /**
+   * Get task or throw error
+   */
+  protected getTaskOrThrow(taskId: string): UnifiedTask {
+    const task = this.managedTasks.get(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
     }
     return task;
   }
+
+  /**
+   * Add task to managed tasks
+   */
+  public addManagedTask(task: UnifiedTask): void {
+    this.managedTasks.set(task.id, task);
+  }
+
+  /**
+   * Remove task from managed tasks
+   */
+  protected removeManagedTask(taskId: string): void {
+    this.managedTasks.delete(taskId);
+  }
+
+  /**
+   * Ensure manager is initialized
+   */
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      throw new Error(`${this.stage} manager is not initialized`);
+    }
+  }
+
+  // Abstract methods to be implemented by subclasses
+  protected abstract onInitialize(): Promise<void>;
+  protected abstract onCleanup(): Promise<void>;
+  protected abstract onInitializeTaskStage(task: UnifiedTask, options: SubTaskStageOptions): Promise<void>;
+  protected abstract onStartTaskStage(task: UnifiedTask): Promise<void>;
+  protected abstract onPauseTaskStage(task: UnifiedTask): Promise<void>;
+  protected abstract onResumeTaskStage(task: UnifiedTask): Promise<void>;
+  protected abstract onCompleteTaskStage(task: UnifiedTask): Promise<void>;
+  protected abstract onFailTaskStage(task: UnifiedTask, error?: Error): Promise<void>;
+  protected abstract onCancelTaskStage(task: UnifiedTask): Promise<void>;
+  protected abstract handleStageStateChange(taskId: string, newState: StageState): Promise<void>;
 } 

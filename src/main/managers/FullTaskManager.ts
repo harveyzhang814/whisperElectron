@@ -1,7 +1,9 @@
 import { EventEmitter } from 'events';
 import {
-  BaseTask,
+  UnifiedTask,
   TaskState,
+  TaskStage,
+  StageState,
   TaskEvent,
   TaskEventType,
   TaskManagerConfig,
@@ -10,14 +12,18 @@ import {
   TaskSortOptions,
   TaskEventHandler,
   TaskStateChangedEvent,
-  TaskProgressUpdatedEvent
+  StageStateChangedEvent,
+  TaskProgressUpdatedEvent,
+  UnifiedTaskOptions,
+  UNIFIED_TASK_TYPE,
+  AudioSourceType
 } from '../types/task';
-import { TaskStorageInterface } from '../types/storage';
+import { UnifiedTaskStorageInterface } from '../types/storage';
 import { SQLiteTaskStorage } from '../storage/SQLiteTaskStorage';
 import { BaseSubTaskManager } from './BaseSubTaskManager';
 import { 
   ConcurrencyConfig, 
-  TaskTypeConcurrencyConfig, 
+  StageConcurrencyConfig, 
   TaskPriority 
 } from '../types/concurrency';
 import { PriorityTaskQueue } from './PriorityTaskQueue';
@@ -26,20 +32,20 @@ import { PriorityTaskQueue } from './PriorityTaskQueue';
  * 类型安全的子任务管理器注册表
  */
 export interface SubTaskManagerRegistry {
-  [key: string]: BaseSubTaskManager<any>;
+  [key: string]: BaseSubTaskManager;
 }
 
 /**
- * FullTaskManager 类负责管理系统中的所有任务。
+ * FullTaskManager 类负责管理系统中的所有统一任务。
  * 实现单例模式以确保只存在一个实例。
  */
 export class FullTaskManager extends EventEmitter {
   private static instance: FullTaskManager; // 单例实例
-  private tasks: Map<string, BaseTask>; // 任务映射表
+  private tasks: Map<string, UnifiedTask>; // 统一任务映射表
   private config: TaskManagerConfig; // 任务管理器配置
-  private storage: TaskStorageInterface; // 存储接口
+  private storage: UnifiedTaskStorageInterface; // 存储接口
   private subTaskManagers: SubTaskManagerRegistry; // 子任务管理器注册表
-  private concurrencyConfigs: TaskTypeConcurrencyConfig; // 并发配置
+  private concurrencyConfigs: StageConcurrencyConfig; // 阶段并发配置
   private taskQueues: Map<string, PriorityTaskQueue>; // 任务队列映射表
 
   private constructor(config: TaskManagerConfig) {
@@ -63,6 +69,11 @@ export class FullTaskManager extends EventEmitter {
         const stateEvent = event as TaskStateChangedEvent;
         this.handleTaskStateChange(stateEvent).catch(error => {
           console.error('Error handling task state change:', error);
+        });
+      } else if (event.type === TaskEventType.STAGE_STATE_CHANGED) {
+        const stageStateEvent = event as StageStateChangedEvent;
+        this.handleStageStateChange(stageStateEvent).catch(error => {
+          console.error('Error handling stage state change:', error);
         });
       }
     });
@@ -102,9 +113,9 @@ export class FullTaskManager extends EventEmitter {
    * @param type 任务类型
    * @param manager 子任务管理器实例
    */
-  public registerSubTaskManager<T extends BaseTask>(
+  public registerSubTaskManager(
     type: string,
-    manager: BaseSubTaskManager<T>
+    manager: BaseSubTaskManager
   ): void {
     if (this.subTaskManagers[type]) {
       throw new Error(`SubTaskManager for type ${type} already registered`);
@@ -112,7 +123,7 @@ export class FullTaskManager extends EventEmitter {
     this.subTaskManagers[type] = manager;
     
     // Initialize the sub-task manager after registration
-    manager.initialize().catch(error => {
+    manager.initialize().catch((error: Error) => {
       console.error(`Failed to initialize ${type} manager:`, error);
     });
   }
@@ -122,60 +133,77 @@ export class FullTaskManager extends EventEmitter {
    * @param type 任务类型
    * @returns 子任务管理器实例或 undefined
    */
-  public getSubTaskManager<T extends BaseTask>(
+  public getSubTaskManager(
     type: string
-  ): BaseSubTaskManager<T> | undefined {
+  ): BaseSubTaskManager | undefined {
     const manager = this.subTaskManagers[type];
     if (!manager) {
       return undefined;
     }
-    return manager as BaseSubTaskManager<T>;
+    return manager;
   }
 
   /**
-   * 创建任务，带有类型检查
-   * @param type 任务类型
-   * @param metadata 任务元数据
-   * @returns 创建的任务实例
+   * 创建统一任务
+   * @param options 任务创建选项（可选，如果不提供则使用默认值）
+   * @returns 创建的统一任务实例
+   * BR: 最好直接使用createTask方法，不要直接使用createUnifiedTask方法，因为createUnifiedTask方法没有初始化子任务管理器
    */
-  public async createTask<T extends BaseTask>(
-    type: string,
-    metadata: TaskMetadata
-  ): Promise<T> {
-    const manager = this.getSubTaskManager<T>(type);
-    if (!manager) {
-      throw new Error(`No manager registered for task type: ${type}`);
-    }
+  public async createUnifiedTask(options?: Partial<UnifiedTaskOptions>): Promise<UnifiedTask> {
+    // 生成默认的 options
+    const defaultOptions: UnifiedTaskOptions = {
+      name: 'New Audio Task',
+      description: 'Audio processing task',
+      tags: ['audio'],
+      audioSourceType: AudioSourceType.RECORDING
+    };
 
-    const task = await this.createBaseTask(type, metadata);
-    return manager.createTask(task.id, {
-      name: metadata.name,
-      description: metadata.description,
-      tags: metadata.tags
-    }) as Promise<T>;
-  }
+    // 合并传入的 options 和默认值
+    const finalOptions: UnifiedTaskOptions = {
+      ...defaultOptions,
+      ...options
+    };
 
-  /**
-   * 创建基础任务
-   * @param type 任务类型
-   * @param metadata 任务元数据
-   * @returns 创建的基础任务实例
-   */
-  private async createBaseTask(
-    type: string,
-    metadata: TaskMetadata
-  ): Promise<BaseTask> {
-    const task: BaseTask = {
+    const task: UnifiedTask = {
       id: this.generateTaskId(),
-      type,
+      type: UNIFIED_TASK_TYPE,
       state: TaskState.CREATED,
       metadata: {
-        ...metadata,
+        name: finalOptions.name || 'New Audio Task',
+        description: finalOptions.description || '',
+        tags: finalOptions.tags || [],
         createdAt: Date.now(),
         updatedAt: Date.now()
       },
-      progress: 0
+      progress: 0,
+      stages: {
+        [TaskStage.AUDIO_SOURCE]: {
+          stage: TaskStage.AUDIO_SOURCE,
+          state: StageState.PENDING,
+          progress: 0,
+          startTime: undefined,
+          endTime: undefined,
+          error: undefined,
+          metadata: undefined
+        },
+        [TaskStage.TRANSCRIPTION]: {
+          stage: TaskStage.TRANSCRIPTION,
+          state: StageState.PENDING,
+          progress: 0,
+          startTime: undefined,
+          endTime: undefined,
+          error: undefined,
+          metadata: undefined
+        }
+      }
     };
+
+    // Set audio source data based on audioSourceType
+    if (finalOptions.audioSourceType) {
+      task.audioSourceData = {
+        audioSourceType: finalOptions.audioSourceType
+      };
+    }
 
     await this.storage.saveTask(task);
     this.tasks.set(task.id, task);
@@ -192,19 +220,85 @@ export class FullTaskManager extends EventEmitter {
   }
 
   /**
+   * 创建任务，带有类型检查
+   * @param type 任务类型
+   * @param metadata 任务元数据（可选，如果不提供则使用默认值）
+   * @returns 创建的任务实例
+   */
+  public async createTask(
+    type: string,
+    metadata?: Partial<TaskMetadata>
+  ): Promise<UnifiedTask> {
+    console.log('🎯 [FullTaskManager] createTask called with type:', type, 'metadata:', metadata);
+    
+    const manager = this.getSubTaskManager(type);
+    if (!manager) {
+      console.error('❌ [FullTaskManager] No manager registered for task type:', type);
+      throw new Error(`No manager registered for task type: ${type}`);
+    }
+    console.log('✅ [FullTaskManager] Found manager for type:', type);
+
+    // 生成默认的 metadata
+    const defaultMetadata: TaskMetadata = {
+      name: `New ${type} Task`,
+      description: `${type} task`,
+      tags: [type.toLowerCase()],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    // 合并传入的 metadata 和默认值
+    const finalMetadata: TaskMetadata = {
+      ...defaultMetadata,
+      ...metadata
+    };
+
+    console.log('📝 [FullTaskManager] Final metadata:', finalMetadata);
+
+    const audioSourceType = type === 'RECORDING' ? AudioSourceType.RECORDING : AudioSourceType.IMPORT;
+    
+    console.log('🔄 [FullTaskManager] Creating unified task with audioSourceType:', audioSourceType);
+    const task = await this.createUnifiedTask({
+      name: finalMetadata.name,
+      description: finalMetadata.description,
+      tags: finalMetadata.tags,
+      audioSourceType
+    });
+    
+    manager.addManagedTask(task); // 确保子任务管理器能拿到新任务
+    
+    console.log('✅ [FullTaskManager] Unified task created:', {
+      id: task.id,
+      type: task.type,
+      state: task.state
+    });
+    
+    // Initialize the task with the sub-task manager
+    console.log('🔄 [FullTaskManager] Initializing task stage with manager...');
+    await manager.initializeTaskStage(task.id, {
+      name: finalMetadata.name,
+      description: finalMetadata.description,
+      tags: finalMetadata.tags
+    });
+    console.log('✅ [FullTaskManager] Task stage initialized successfully');
+
+    return task;
+  }
+
+  /**
    * 根据ID获取任务
    * @param taskId 任务ID
    * @returns 任务实例或 undefined
    */
-  public async getTask(taskId: string): Promise<BaseTask | undefined> {
+  public async getTask(taskId: string): Promise<UnifiedTask | undefined> {
     // First check if we have the task in memory
     let task = this.tasks.get(taskId);
 
     // If not in memory, try to load from storage
     if (!task) {
-    const storedTask = await this.storage.loadTask(taskId);
-    if (storedTask) {
-      this.tasks.set(storedTask.id, storedTask);
+      const storedTask = await this.storage.loadTask(taskId);
+      if (storedTask) {
+        this.tasks.set(storedTask.id, storedTask);
         task = storedTask;
       }
     }
@@ -214,7 +308,7 @@ export class FullTaskManager extends EventEmitter {
       // Try to get the latest version from the appropriate sub-task manager
       const manager = this.getSubTaskManager(task.type);
       if (manager) {
-        const subTask = manager.getTask(taskId);
+        const subTask = manager.getManagedTask(taskId);
         if (subTask) {
           // Update our memory with the latest state from sub-task manager
           this.tasks.set(taskId, subTask);
@@ -233,7 +327,7 @@ export class FullTaskManager extends EventEmitter {
    * @param sort 排序选项
    * @returns 任务数组
    */
-  public async getTasks(filter?: TaskFilterOptions, sort?: TaskSortOptions): Promise<BaseTask[]> {
+  public async getTasks(filter?: TaskFilterOptions, sort?: TaskSortOptions): Promise<UnifiedTask[]> {
     console.log('🔄 [FullTaskManager] Getting all tasks...');
     
     // Ensure all tasks are loaded from storage
@@ -246,7 +340,8 @@ export class FullTaskManager extends EventEmitter {
         state: task.state,
         progress: task.progress,
         metadata: task.metadata,
-        extendedData: task.extendedData
+        audioSourceData: task.audioSourceData,
+        transcriptionData: task.transcriptionData
       }))
     });
     
@@ -257,7 +352,7 @@ export class FullTaskManager extends EventEmitter {
     });
 
     // Get all tasks from memory and update with latest states from sub-task managers
-    const allTasks: BaseTask[] = [];
+    const allTasks: UnifiedTask[] = [];
     
     for (const [taskId, task] of this.tasks.entries()) {
       console.log(`🔍 [FullTaskManager] Processing task ${taskId}:`, {
@@ -269,11 +364,12 @@ export class FullTaskManager extends EventEmitter {
       // Try to get the latest version from the appropriate sub-task manager
       const manager = this.getSubTaskManager(task.type);
       if (manager) {
-        const subTask = manager.getTask(taskId);
+        const subTask = manager.getManagedTask(taskId);
         console.log(`📋 [FullTaskManager] Sub-task manager result for ${taskId}:`, {
           found: !!subTask,
           state: subTask?.state,
-          extendedData: subTask?.extendedData
+          audioSourceData: subTask?.audioSourceData,
+          transcriptionData: subTask?.transcriptionData
         });
         
         if (subTask) {
@@ -296,7 +392,8 @@ export class FullTaskManager extends EventEmitter {
         state: task.state,
         progress: task.progress,
         metadata: task.metadata,
-        extendedData: task.extendedData
+        audioSourceData: task.audioSourceData,
+        transcriptionData: task.transcriptionData
       }))
     });
 
@@ -307,8 +404,20 @@ export class FullTaskManager extends EventEmitter {
       if (filter.states) {
         tasks = tasks.filter(task => filter.states!.includes(task.state));
       }
-      if (filter.types) {
-        tasks = tasks.filter(task => filter.types!.includes(task.type));
+      if (filter.audioSourceTypes) {
+        tasks = tasks.filter(task => 
+          task.audioSourceData && filter.audioSourceTypes!.includes(task.audioSourceData.audioSourceType)
+        );
+      }
+      if (filter.stageStates) {
+        tasks = tasks.filter(task => {
+          for (const [stage, state] of Object.entries(filter.stageStates!)) {
+            if (task.stages[stage as TaskStage]?.state !== state) {
+              return false;
+            }
+          }
+          return true;
+        });
       }
       if (filter.tags) {
         tasks = tasks.filter(task => 
@@ -352,21 +461,34 @@ export class FullTaskManager extends EventEmitter {
    * @param taskId 任务ID
    * @param newState 新状态
    */
-  public async updateTaskState<T extends BaseTask>(
+  public async updateTaskState(
     taskId: string,
     newState: TaskState
   ): Promise<void> {
-    const task = await this.getTask(taskId) as T;
+    const task = await this.getTask(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
     }
 
-    const manager = this.getSubTaskManager<T>(task.type);
+    const manager = this.getSubTaskManager(task.type);
     if (!manager) {
       throw new Error(`No manager registered for task type: ${task.type}`);
     }
 
-    await manager.updateTaskState(taskId, newState);
+    // Update the task state in storage
+    task.state = newState;
+    task.metadata.updatedAt = Date.now();
+    await this.storage.saveTask(task);
+    this.tasks.set(taskId, task);
+
+    // Emit state change event
+    await this.emitTaskEvent({
+      type: TaskEventType.STATE_CHANGED,
+      taskId,
+      timestamp: Date.now(),
+      previousState: task.state,
+      newState
+    } as TaskStateChangedEvent);
   }
 
   /**
@@ -398,21 +520,40 @@ export class FullTaskManager extends EventEmitter {
    * 删除任务，带有类型检查
    * @param taskId 任务ID
    */
-  public async deleteTask<T extends BaseTask>(taskId: string): Promise<void> {
-    const task = await this.getTask(taskId) as T;
+  public async deleteTask(taskId: string): Promise<void> {
+    const task = await this.getTask(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
     }
 
-    const manager = this.getSubTaskManager<T>(task.type);
-    if (!manager) {
-      throw new Error(`No manager registered for task type: ${task.type}`);
+    // 删除音频文件（如果有）
+    const audioFilePath = task.audioSourceData?.audioFilePath;
+    if (audioFilePath) {
+      const fs = await import('fs');
+      try {
+        await fs.promises.unlink(audioFilePath);
+        console.log(`[FullTaskManager] Deleted audio file: ${audioFilePath}`);
+      } catch (err) {
+        if (err && (err as any).code === 'ENOENT') {
+          console.warn(`[FullTaskManager] Audio file already deleted: ${audioFilePath}`);
+        } else {
+          console.error(`[FullTaskManager] Failed to delete audio file: ${audioFilePath}`, err);
+        }
+      }
     }
 
-    await manager.deleteTask(taskId);
+    // Remove from sub-task manager if exists
+    const manager = this.getSubTaskManager(task.type);
+    if (manager) {
+      // Note: BaseSubTaskManager doesn't have a deleteTask method
+      // The task will be removed from memory when the manager is cleaned up
+    }
+
+    // Remove from storage and memory
     await this.storage.deleteTask(taskId);
     this.tasks.delete(taskId);
-    
+
+    // Emit deletion event
     await this.emitTaskEvent({
       type: TaskEventType.TASK_DELETED,
       taskId,
@@ -484,7 +625,7 @@ export class FullTaskManager extends EventEmitter {
    * 获取存储实例（供子任务管理器使用）
    * @returns 存储接口实例
    */
-  public getStorage(): TaskStorageInterface {
+  public getStorage(): UnifiedTaskStorageInterface {
     return this.storage;
   }
 
@@ -536,7 +677,7 @@ export class FullTaskManager extends EventEmitter {
    * @param task 任务实例
    * @param priority 任务优先级
    */
-  private enqueueTask(task: BaseTask, priority: TaskPriority = TaskPriority.NORMAL): void {
+  private enqueueTask(task: UnifiedTask, priority: TaskPriority = TaskPriority.NORMAL): void {
     let queue = this.taskQueues.get(task.type);
     if (!queue) {
       queue = new PriorityTaskQueue();
@@ -550,9 +691,10 @@ export class FullTaskManager extends EventEmitter {
    * @param taskType 任务类型
    * @returns 任务实例或 undefined
    */
-  private dequeueTask(taskType: string): BaseTask | undefined {
+  private dequeueTask(taskType: string): UnifiedTask | undefined {
     const queue = this.taskQueues.get(taskType);
-    return queue?.dequeue();
+    const queuedTask = queue?.dequeue();
+    return queuedTask?.task;
   }
 
   /**
@@ -589,7 +731,7 @@ export class FullTaskManager extends EventEmitter {
       const manager = this.getSubTaskManager(nextTask.type);
       if (manager) {
         try {
-          await manager.startTask(nextTask.id);
+          await manager.startTaskStage(nextTask.id);
         } catch (error) {
           console.error(`Failed to start task ${nextTask.id}:`, error);
           // 如果启动失败，更新任务状态为失败
@@ -617,22 +759,22 @@ export class FullTaskManager extends EventEmitter {
    * @param taskId 任务ID
    * @param priority 任务优先级
    */
-  public async startTask<T extends BaseTask>(
+  public async startTask(
     taskId: string,
     priority: TaskPriority = TaskPriority.NORMAL
   ): Promise<void> {
-    const task = await this.getTask(taskId) as T;
+    const task = await this.getTask(taskId);
     if (!task) {
       throw new Error(`Task not found: ${taskId}`);
     }
 
-    const manager = this.getSubTaskManager<T>(task.type);
+    const manager = this.getSubTaskManager(task.type);
     if (!manager) {
       throw new Error(`No manager registered for task type: ${task.type}`);
     }
 
     if (this.canStartTask(task.type)) {
-      await manager.startTask(taskId);
+      await manager.startTaskStage(taskId);
     } else {
       this.enqueueTask(task, priority);
       await this.emitTaskEvent({
@@ -640,7 +782,7 @@ export class FullTaskManager extends EventEmitter {
         taskId,
         timestamp: Date.now(),
         previousState: task.state,
-        newState: TaskState.INITIALIZING
+        newState: TaskState.CREATED
       } as TaskStateChangedEvent);
     }
   }
@@ -685,5 +827,38 @@ export class FullTaskManager extends EventEmitter {
       });
     }
     return removed;
+  }
+
+  // 新增：处理阶段状态变化事件
+  private async handleStageStateChange(event: StageStateChangedEvent): Promise<void> {
+    const task = await this.getTask(event.taskId);
+    if (!task) return;
+    // 更新内存中的任务状态
+    this.tasks.set(event.taskId, task);
+    // 根据阶段状态更新整体任务状态
+    await this.updateTaskStateBasedOnStages(event.taskId);
+  }
+
+  // 新增：根据所有阶段状态自动推导任务整体状态
+  private async updateTaskStateBasedOnStages(taskId: string): Promise<void> {
+    const task = this.tasks.get(taskId);
+    if (!task) return;
+    const audioSourceStage = task.stages[TaskStage.AUDIO_SOURCE];
+    const transcriptionStage = task.stages[TaskStage.TRANSCRIPTION];
+    let newTaskState: TaskState;
+    if (audioSourceStage.state === StageState.FAILED || transcriptionStage.state === StageState.FAILED) {
+      newTaskState = TaskState.FAILED;
+    } else if (audioSourceStage.state === StageState.COMPLETED && transcriptionStage.state === StageState.COMPLETED) {
+      newTaskState = TaskState.COMPLETED;
+    } else if (audioSourceStage.state === StageState.IN_PROGRESS || transcriptionStage.state === StageState.IN_PROGRESS) {
+      newTaskState = TaskState.RUNNING;
+    } else if (audioSourceStage.state === StageState.CANCELLED || transcriptionStage.state === StageState.CANCELLED) {
+      newTaskState = TaskState.CANCELLED;
+    } else {
+      newTaskState = TaskState.CREATED;
+    }
+    if (task.state !== newTaskState) {
+      await this.updateTaskState(taskId, newTaskState);
+    }
   }
 }

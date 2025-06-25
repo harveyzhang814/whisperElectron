@@ -1,9 +1,9 @@
-import { BaseTask, TaskState } from './task';
+import { StageState } from './task';
 
 /**
- * Recording-specific task states
+ * Recording-specific stage states for the audio source stage
  */
-export enum RecordingState {
+export enum RecordingStageState {
   READY = 'READY',
   RECORDING = 'RECORDING',
   PAUSED = 'PAUSED',
@@ -14,7 +14,7 @@ export enum RecordingState {
 }
 
 /**
- * Recording-specific event types that extend the base TaskEventType
+ * Recording-specific event types for the audio source stage
  */
 export enum RecordingEventType {
   AUDIO_LEVEL_CHANGED = 'AUDIO_LEVEL_CHANGED',
@@ -33,7 +33,7 @@ export interface AudioDevice {
 }
 
 /**
- * Recording configuration
+ * Recording configuration for the audio source stage
  */
 export interface RecordingConfig {
   deviceId?: string;
@@ -47,7 +47,7 @@ export interface RecordingConfig {
 }
 
 /**
- * Recording task metadata
+ * Recording metadata for the audio source stage
  */
 export interface RecordingMetadata {
   deviceId: string;
@@ -58,16 +58,6 @@ export interface RecordingMetadata {
   duration: number;
   fileSize?: number;
   outputPath?: string;
-}
-
-/**
- * Recording task interface
- */
-export interface RecordingTask extends BaseTask {
-  type: 'RECORDING';
-  recordingState: RecordingState;
-  config: RecordingConfig;
-  recordingMetadata: RecordingMetadata;
 }
 
 /**
@@ -113,14 +103,23 @@ export type RecordingEvent =
   | RecordingErrorEvent;
 
 /**
- * State mapping between RecordingState and TaskState
+ * State mapping between RecordingStageState and StageState
  */
-export const recordingStateToTaskState: Record<RecordingState, TaskState> = {
-  [RecordingState.READY]: TaskState.CREATED,
-  [RecordingState.RECORDING]: TaskState.RUNNING,
-  [RecordingState.PAUSED]: TaskState.PAUSED,
-  [RecordingState.STOPPED]: TaskState.COMPLETED,
-  [RecordingState.SAVING]: TaskState.RUNNING,
-  [RecordingState.SAVED]: TaskState.COMPLETED,
-  [RecordingState.FAILED]: TaskState.FAILED
-}; 
+export const recordingStageStateToStageState: Record<RecordingStageState, StageState> = {
+  [RecordingStageState.READY]: StageState.PENDING,
+  [RecordingStageState.RECORDING]: StageState.IN_PROGRESS,
+  [RecordingStageState.PAUSED]: StageState.IN_PROGRESS,
+  [RecordingStageState.STOPPED]: StageState.COMPLETED,
+  [RecordingStageState.SAVING]: StageState.IN_PROGRESS,
+  [RecordingStageState.SAVED]: StageState.COMPLETED,
+  [RecordingStageState.FAILED]: StageState.FAILED
+};
+
+/**
+ * Recording stage metadata for TaskStageInfo
+ */
+export interface RecordingStageMetadata {
+  recordingState: RecordingStageState;
+  config: RecordingConfig;
+  recordingMetadata: RecordingMetadata;
+} 

@@ -215,6 +215,20 @@ export class ConfigManager extends EventEmitter {
         outputFormat: 'json',
         enableHealthCheck: true,
         healthCheckInterval: 60000
+      },
+      transcription: {
+        defaultModel: 'base',
+        defaultLanguage: '',
+        maxConcurrentTranscriptions: 3,
+        autoTranscribeRecordings: false,
+        outputDirectory: path.join(app.getPath('userData'), 'transcriptions'),
+        defaultOutputFormat: 'txt',
+        defaultTemperature: 0.0,
+        enableCaching: true,
+        cacheDirectory: path.join(app.getPath('userData'), 'transcription-cache'),
+        maxCacheSize: 100,
+        enableAutoCleanup: true,
+        retentionPeriod: 30
       }
     };
   }

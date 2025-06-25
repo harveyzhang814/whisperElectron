@@ -2,11 +2,17 @@ import { app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as sqlite3 from 'sqlite3';
-import { TaskStorageInterface } from '../types/storage';
-import { BaseTask, TaskState } from '../types/task';
+import { 
+  UnifiedTask, 
+  TaskStage, 
+  StageState,
+  AudioSourceType,
+  UNIFIED_TASK_TYPE 
+} from '../types/task';
+import { UnifiedTaskStorageInterface } from '../types/storage';
 
 /**
- * Database row type
+ * Database row type for unified tasks
  */
 interface TaskRow {
   id: string;
@@ -20,9 +26,9 @@ interface TaskRow {
 }
 
 /**
- * SQLite implementation of task storage
+ * SQLite implementation of unified task storage
  */
-export class SQLiteTaskStorage implements TaskStorageInterface {
+export class SQLiteTaskStorage implements UnifiedTaskStorageInterface {
   private db: sqlite3.Database | null = null;
   private readonly dbPath: string;
   private readonly backupDir: string;
@@ -67,23 +73,19 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
   }
 
   /**
-   * Save a task to the database
+   * Save a unified task to the database
    */
-  public async saveTask(task: BaseTask): Promise<void> {
+  public async saveTask(task: UnifiedTask): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     const now = Date.now();
     
-    // Prepare extended data for recording tasks
-    let extendedData = null;
-    if (task.type === 'RECORDING') {
-      const recordingTask = task as any;
-      extendedData = {
-        recordingMetadata: recordingTask.recordingMetadata,
-        config: recordingTask.config,
-        recordingState: recordingTask.recordingState
-      };
-    }
+    // Serialize the complete unified task structure
+    const serializedTask = {
+      ...task,
+      // Ensure type is always AUDIO_PROCESSING
+      type: UNIFIED_TASK_TYPE
+    };
 
     return new Promise((resolve, reject) => {
       this.db!.run(
@@ -92,12 +94,9 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           task.id,
-          task.type,
+          UNIFIED_TASK_TYPE,
           task.state,
-          JSON.stringify({
-            ...task.metadata,
-            extendedData // Include extended data in metadata
-          }),
+          JSON.stringify(serializedTask),
           task.progress,
           task.error ? JSON.stringify(task.error) : null,
           task.metadata.createdAt,
@@ -112,9 +111,9 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
   }
 
   /**
-   * Load a task from the database
+   * Load a unified task from the database
    */
-  public async loadTask(taskId: string): Promise<BaseTask | null> {
+  public async loadTask(taskId: string): Promise<UnifiedTask | null> {
     if (!this.db) throw new Error('Database not initialized');
 
     return new Promise((resolve, reject) => {
@@ -132,19 +131,7 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
           }
 
           try {
-            const parsedMetadata = JSON.parse(row.metadata);
-            const { extendedData, ...baseMetadata } = parsedMetadata;
-            
-            const task: BaseTask = {
-              id: row.id,
-              type: row.type,
-              state: row.state as TaskState,
-              metadata: baseMetadata,
-              progress: row.progress,
-              error: row.error ? JSON.parse(row.error) : undefined,
-              // Include extended data if available
-              ...(extendedData && { extendedData })
-            };
+            const task = this.deserializeTask(row);
             resolve(task);
           } catch (error) {
             reject(error);
@@ -155,9 +142,9 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
   }
 
   /**
-   * Load all tasks from the database
+   * Load all unified tasks from the database
    */
-  public async loadAllTasks(): Promise<BaseTask[]> {
+  public async loadAllTasks(): Promise<UnifiedTask[]> {
     if (!this.db) throw new Error('Database not initialized');
 
     console.log('🔄 [SQLiteTaskStorage] Loading all tasks from database...');
@@ -188,21 +175,7 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
               }))
             });
 
-            const tasks: BaseTask[] = rows.map(row => {
-              const parsedMetadata = JSON.parse(row.metadata);
-              const { extendedData, ...baseMetadata } = parsedMetadata;
-              
-              return {
-              id: row.id,
-              type: row.type,
-              state: row.state as TaskState,
-                metadata: baseMetadata,
-              progress: row.progress,
-                error: row.error ? JSON.parse(row.error) : undefined,
-                // Include extended data if available
-                ...(extendedData && { extendedData })
-              };
-            });
+            const tasks: UnifiedTask[] = rows.map(row => this.deserializeTask(row));
 
             console.log('✅ [SQLiteTaskStorage] Parsed tasks:', {
               count: tasks.length,
@@ -212,18 +185,154 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
                 state: task.state,
                 progress: task.progress,
                 metadata: task.metadata,
-                extendedData: task.extendedData
+                audioSourceData: task.audioSourceData,
+                transcriptionData: task.transcriptionData
               }))
             });
 
             resolve(tasks);
           } catch (error) {
-            console.error('❌ [SQLiteTaskStorage] Parse error:', error);
+            console.error('❌ [SQLiteTaskStorage] Error parsing tasks:', error);
             reject(error);
           }
         }
       );
     });
+  }
+
+  /**
+   * Get tasks by audio source type
+   */
+  public async getTasksByAudioSourceType(audioSourceType: string): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.audioSourceData?.audioSourceType === audioSourceType
+    );
+  }
+
+  /**
+   * Get tasks by stage state
+   */
+  public async getTasksByStageState(stage: string, state: string): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.stages[stage as TaskStage]?.state === state
+    );
+  }
+
+  /**
+   * Get tasks by audio file path
+   */
+  public async getTasksByAudioFilePath(audioFilePath: string): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.audioSourceData?.audioFilePath === audioFilePath
+    );
+  }
+
+  /**
+   * Get tasks by filter criteria
+   */
+  public async getTasksByFilter(filter: {
+    states?: string[];
+    audioSourceTypes?: string[];
+    stageStates?: { [key: string]: string };
+    tags?: string[];
+    fromDate?: number;
+    toDate?: number;
+  }): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    
+    return allTasks.filter(task => {
+      // Filter by states
+      if (filter.states && !filter.states.includes(task.state)) {
+        return false;
+      }
+
+      // Filter by audio source types
+      if (filter.audioSourceTypes && 
+          !filter.audioSourceTypes.includes(task.audioSourceData?.audioSourceType || '')) {
+        return false;
+      }
+
+      // Filter by stage states
+      if (filter.stageStates) {
+        for (const [stage, state] of Object.entries(filter.stageStates)) {
+          if (task.stages[stage as TaskStage]?.state !== state) {
+            return false;
+          }
+        }
+      }
+
+      // Filter by tags
+      if (filter.tags && filter.tags.length > 0) {
+        const taskTags = task.metadata.tags || [];
+        if (!filter.tags.some(tag => taskTags.includes(tag))) {
+          return false;
+        }
+      }
+
+      // Filter by date range
+      if (filter.fromDate && task.metadata.createdAt < filter.fromDate) {
+        return false;
+      }
+      if (filter.toDate && task.metadata.createdAt > filter.toDate) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Get tasks by tag
+   */
+  public async getTasksByTag(tag: string): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.metadata.tags?.includes(tag)
+    );
+  }
+
+  /**
+   * Get tasks created within a date range
+   */
+  public async getTasksByDateRange(fromDate: number, toDate: number): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.metadata.createdAt >= fromDate && task.metadata.createdAt <= toDate
+    );
+  }
+
+  /**
+   * Get tasks that have completed transcription
+   */
+  public async getTasksWithCompletedTranscription(): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.stages[TaskStage.TRANSCRIPTION]?.state === StageState.COMPLETED
+    );
+  }
+
+  /**
+   * Get tasks that have failed transcription
+   */
+  public async getTasksWithFailedTranscription(): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.stages[TaskStage.TRANSCRIPTION]?.state === StageState.FAILED
+    );
+  }
+
+  /**
+   * Get tasks that are ready for transcription
+   */
+  public async getTasksReadyForTranscription(): Promise<UnifiedTask[]> {
+    const allTasks = await this.loadAllTasks();
+    return allTasks.filter(task => 
+      task.stages[TaskStage.AUDIO_SOURCE]?.state === StageState.COMPLETED &&
+      task.stages[TaskStage.TRANSCRIPTION]?.state === StageState.PENDING
+    );
   }
 
   /**
@@ -233,14 +342,10 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
     if (!this.db) throw new Error('Database not initialized');
 
     return new Promise((resolve, reject) => {
-      this.db!.run(
-        'DELETE FROM tasks WHERE id = ?',
-        [taskId],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
+      this.db!.run('DELETE FROM tasks WHERE id = ?', [taskId], (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
     });
   }
 
@@ -250,63 +355,152 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
   public async deleteTasks(taskIds: string[]): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
+    const placeholders = taskIds.map(() => '?').join(',');
+    
     return new Promise((resolve, reject) => {
-      this.db!.run(
-        'DELETE FROM tasks WHERE id IN (' + taskIds.map(() => '?').join(',') + ')',
-        taskIds,
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
+      this.db!.run(`DELETE FROM tasks WHERE id IN (${placeholders})`, taskIds, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
     });
   }
 
   /**
-   * Create a backup of the database
+   * Clean up old task data
+   */
+  public async cleanupOldTasks(retentionDays: number): Promise<number> {
+    const cutoffDate = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
+    const allTasks = await this.loadAllTasks();
+    const oldTasks = allTasks.filter(task => task.metadata.createdAt < cutoffDate);
+    
+    if (oldTasks.length > 0) {
+      const taskIds = oldTasks.map(task => task.id);
+      await this.deleteTasks(taskIds);
+    }
+    
+    return oldTasks.length;
+  }
+
+  /**
+   * Get storage statistics
+   */
+  public async getStorageStats(): Promise<{
+    totalTasks: number;
+    recordingTasks: number;
+    importTasks: number;
+    completedTranscriptions: number;
+    failedTranscriptions: number;
+    totalStorageSize: number;
+    averageProcessingTime: number;
+  }> {
+    const allTasks = await this.loadAllTasks();
+    
+    const recordingTasks = allTasks.filter(task => 
+      task.audioSourceData?.audioSourceType === AudioSourceType.RECORDING
+    ).length;
+    
+    const importTasks = allTasks.filter(task => 
+      task.audioSourceData?.audioSourceType === AudioSourceType.IMPORT
+    ).length;
+    
+    const completedTranscriptions = allTasks.filter(task => 
+      task.stages[TaskStage.TRANSCRIPTION]?.state === StageState.COMPLETED
+    ).length;
+    
+    const failedTranscriptions = allTasks.filter(task => 
+      task.stages[TaskStage.TRANSCRIPTION]?.state === StageState.FAILED
+    ).length;
+    
+    // Calculate total storage size (simplified)
+    const totalStorageSize = allTasks.reduce((total, task) => {
+      return total + (task.audioSourceData?.fileSize || 0);
+    }, 0);
+    
+    // Calculate average processing time (simplified)
+    const processingTimes = allTasks
+      .filter(task => task.transcriptionData?.processingTime)
+      .map(task => task.transcriptionData!.processingTime!);
+    
+    const averageProcessingTime = processingTimes.length > 0 
+      ? processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length 
+      : 0;
+
+    return {
+      totalTasks: allTasks.length,
+      recordingTasks,
+      importTasks,
+      completedTranscriptions,
+      failedTranscriptions,
+      totalStorageSize,
+      averageProcessingTime
+    };
+  }
+
+  /**
+   * Migrate old task data to new unified format
+   */
+  public async migrateOldTaskData(): Promise<{
+    migratedCount: number;
+    failedCount: number;
+    errors: string[];
+  }> {
+    // 不再需要迁移，直接返回空结果
+    return { migratedCount: 0, failedCount: 0, errors: [] };
+  }
+
+  /**
+   * Create a backup of the storage
    */
   public async backup(): Promise<string> {
+    if (!this.db) throw new Error('Database not initialized');
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupPath = path.join(this.backupDir, `tasks-backup-${timestamp}.db`);
 
-    await fs.promises.copyFile(this.dbPath, backupPath);
-    return backupPath;
+    return new Promise((resolve, reject) => {
+      (this.db as any).backup(backupPath, (err: Error | null) => {
+        if (err) reject(err);
+        else resolve(backupPath);
+      });
+    });
   }
 
   /**
    * Restore from a backup
    */
   public async restore(backupPath: string): Promise<void> {
-    if (!fs.existsSync(backupPath)) {
-      throw new Error(`Backup file not found: ${backupPath}`);
-    }
+    if (!this.db) throw new Error('Database not initialized');
 
-    // Close current connection
-    await this.close();
-
-    // Restore backup
-    await fs.promises.copyFile(backupPath, this.dbPath);
-
-    // Reinitialize database
-    await this.initialize();
+    return new Promise((resolve, reject) => {
+      (this.db as any).backup(backupPath, (err: Error | null) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
   }
 
   /**
    * Clean up old backups
    */
   public async cleanBackups(keepCount: number): Promise<void> {
-    const backups = await fs.promises.readdir(this.backupDir);
-    const sortedBackups = backups
+    const files = await fs.promises.readdir(this.backupDir);
+    const backupFiles = files
       .filter(file => file.startsWith('tasks-backup-') && file.endsWith('.db'))
-      .sort((a, b) => {
-        const statA = fs.statSync(path.join(this.backupDir, a));
-        const statB = fs.statSync(path.join(this.backupDir, b));
-        return statB.mtime.getTime() - statA.mtime.getTime();
-      });
+      .map(file => ({
+        name: file,
+        path: path.join(this.backupDir, file),
+        mtime: fs.statSync(path.join(this.backupDir, file)).mtime
+      }))
+      .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 
-    const backupsToDelete = sortedBackups.slice(keepCount);
-    for (const backup of backupsToDelete) {
-      await fs.promises.unlink(path.join(this.backupDir, backup));
+    // Keep only the most recent backups
+    const filesToDelete = backupFiles.slice(keepCount);
+    for (const file of filesToDelete) {
+      try {
+        await fs.promises.unlink(file.path);
+      } catch (error) {
+        console.warn(`Failed to delete backup file: ${file.path}`, error);
+      }
     }
   }
 
@@ -314,19 +508,27 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
    * Close the database connection
    */
   public async close(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.db) {
-        resolve();
-        return;
-      }
+    if (!this.db) return;
 
-      this.db.close((err) => {
+    return new Promise((resolve, reject) => {
+      this.db!.close((err) => {
         if (err) reject(err);
-        else {
-          this.db = null;
-          resolve();
-        }
+        else resolve();
       });
     });
+  }
+
+  /**
+   * Deserialize task from database row
+   */
+  private deserializeTask(row: TaskRow): UnifiedTask {
+    try {
+      const taskData = JSON.parse(row.metadata);
+      
+      // 直接返回统一任务格式
+      return taskData as UnifiedTask;
+    } catch (error) {
+      throw new Error(`Failed to deserialize task ${row.id}: ${error}`);
+    }
   }
 } 

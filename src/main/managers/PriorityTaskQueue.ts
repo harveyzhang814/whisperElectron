@@ -1,4 +1,4 @@
-import { BaseTask } from '../types/task';
+import { UnifiedTask } from '../types/task';
 import { TaskQueue, QueuedTask, TaskPriority } from '../types/concurrency';
 
 /**
@@ -14,7 +14,7 @@ export class PriorityTaskQueue implements TaskQueue {
   /**
    * Add a task to the queue with priority
    */
-  public enqueue(task: BaseTask, priority: TaskPriority = TaskPriority.NORMAL): void {
+  public enqueue(task: UnifiedTask, priority: TaskPriority = TaskPriority.NORMAL): void {
     const queuedTask: QueuedTask = {
       task,
       priority,
@@ -37,16 +37,16 @@ export class PriorityTaskQueue implements TaskQueue {
   /**
    * Remove and return the highest priority task
    */
-  public dequeue(): BaseTask | undefined {
+  public dequeue(): QueuedTask | undefined {
     const item = this.queue.shift();
-    return item?.task;
+    return item;
   }
 
   /**
    * Look at the highest priority task without removing it
    */
-  public peek(): BaseTask | undefined {
-    return this.queue[0]?.task;
+  public peek(): QueuedTask | undefined {
+    return this.queue[0];
   }
 
   /**
@@ -82,8 +82,18 @@ export class PriorityTaskQueue implements TaskQueue {
   /**
    * Get all tasks in the queue
    */
-  public getTasks(): BaseTask[] {
+  public getTasks(): UnifiedTask[] {
     return this.queue.map(item => item.task);
+  }
+
+  /**
+   * Get tasks by stage
+   */
+  public getTasksByStage(stage: string): QueuedTask[] {
+    return this.queue.filter(item => {
+      // Check if the task has the specified stage
+      return item.task.stages && stage in item.task.stages;
+    });
   }
 
   /**

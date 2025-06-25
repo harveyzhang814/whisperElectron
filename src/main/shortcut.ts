@@ -1,7 +1,7 @@
 import { globalShortcut, BrowserWindow } from 'electron';
 import { FullTaskManager } from './managers/FullTaskManager';
 import { RecordingSubTaskManager } from './managers/RecordingSubTaskManager';
-import { TaskMetadata } from './types/task';
+import { AudioSourceType } from './types/task';
 
 // 全局任务管理器实例（在index.ts中初始化）
 let fullTaskManager: FullTaskManager | null = null;
@@ -107,20 +107,18 @@ export class ShortcutManager {
       case ShortcutAction.START_RECORDING:
         if (!isRecording) {
           try {
-            // 直接调用任务管理器开始录音
-            const taskMetadata: TaskMetadata = {
+            // 统一任务参数
+            const taskOptions = {
               name: 'New Recording',
               description: 'Audio recording task',
               tags: ['recording'],
-              createdAt: Date.now(),
-              updatedAt: Date.now()
+              audioSourceType: AudioSourceType.RECORDING
             };
-
-            const task = await fullTaskManager.createTask('RECORDING', taskMetadata);
-            await fullTaskManager.startTask(task.id);
-            
+            // 创建 unified 任务
+            const task = await fullTaskManager.createUnifiedTask(taskOptions);
+            // 启动录音阶段
+            await recordingManager.startTaskStage(task.id);
             console.log('Started recording via shortcut:', task.id);
-            // 发送录音状态更新
             BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: true });
           } catch (error) {
             console.error('Error in START_RECORDING shortcut:', error);
@@ -132,13 +130,11 @@ export class ShortcutManager {
       case ShortcutAction.STOP_RECORDING:
         if (isRecording) {
           try {
-            // 获取当前录音任务ID
             const currentTaskId = recordingManager.getCurrentRecordingTaskId();
             if (currentTaskId) {
-              // 调用录音管理器的stopTask方法，这会实际停止录音器
-              await recordingManager.stopTask(currentTaskId);
+              // 统一任务流：停止录音阶段
+              await recordingManager.stopTaskStage(currentTaskId);
               console.log('Stopped recording via shortcut:', currentTaskId);
-              // 发送录音状态更新
               BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
             }
           } catch (error) {
@@ -151,13 +147,11 @@ export class ShortcutManager {
       case ShortcutAction.CANCEL_RECORDING:
         if (isRecording) {
           try {
-            // 获取当前录音任务ID
             const currentTaskId = recordingManager.getCurrentRecordingTaskId();
             if (currentTaskId) {
-              // 调用录音管理器的cancelTask方法，这会实际停止录音器并删除文件
-              await recordingManager.cancelTask(currentTaskId);
+              // 统一任务流：取消录音阶段
+              await recordingManager.cancelTaskStage(currentTaskId);
               console.log('Cancelled recording via shortcut:', currentTaskId);
-              // 发送录音状态更新
               BrowserWindow.getAllWindows()[0]?.webContents.send('recording:status', { isRecording: false });
             }
           } catch (error) {

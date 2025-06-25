@@ -71,15 +71,50 @@ interface TranscribeProgress {
   error?: string;
 }
 
-interface TranscribeTask {
-  id: string;
-  filePath: string;
-  status: 'pending' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled';
-  progress: TranscribeProgress;
-  result?: WhisperTranscribeResponse;
+interface AudioConfig {
+  sampleRate: number;
+  channels: number;
+  bitDepth: number;
+  format: string;
+}
+
+// Unified Task Management Interface
+interface UnifiedTaskResult {
+  success: boolean;
+  task?: any;
+  tasks?: any[];
   error?: string;
-  createdAt: Date;
-  completedAt?: Date;
+}
+
+interface UnifiedTaskOptions {
+  name: string;
+  description?: string;
+  tags?: string[];
+  audioSourceType: 'RECORDING' | 'IMPORT';
+  recordingConfig?: {
+    deviceId?: string;
+    sampleRate?: number;
+    channels?: number;
+    format?: 'wav' | 'mp3';
+    outputDirectory?: string;
+  };
+  importConfig?: {
+    filePath: string;
+    outputDirectory?: string;
+  };
+  transcriptionConfig?: {
+    model?: string;
+    language?: string;
+    outputFormat?: 'txt' | 'json' | 'srt' | 'vtt';
+    temperature?: number;
+  };
+}
+
+interface TranscriptionOptions {
+  model?: string;
+  language?: string;
+  outputFormat?: 'txt' | 'json' | 'srt' | 'vtt';
+  temperature?: number;
 }
 
 export interface ElectronAPI {
@@ -90,13 +125,34 @@ export interface ElectronAPI {
   getShortcuts: () => Promise<ShortcutConfig[]>;
   updateShortcut: (action: string, config: Partial<ShortcutConfig>) => Promise<void>;
   
-  // Recording related methods - 使用新的recording:接口
+  // Unified Task Management - 新的统一任务管理接口
+  createUnifiedTask: (options: UnifiedTaskOptions) => Promise<UnifiedTaskResult>;
+  getUnifiedTask: (taskId: string) => Promise<UnifiedTaskResult>;
+  getAllUnifiedTasks: () => Promise<UnifiedTaskResult>;
+  updateUnifiedTask: (taskId: string, updates: any) => Promise<UnifiedTaskResult>;
+  deleteUnifiedTask: (taskId: string) => Promise<UnifiedTaskResult>;
+  
+  // Stage Management - 阶段管理接口
+  startTaskStage: (taskId: string, stage: 'AUDIO_SOURCE' | 'TRANSCRIPTION') => Promise<UnifiedTaskResult>;
+  stopTaskStage: (taskId: string, stage: 'AUDIO_SOURCE' | 'TRANSCRIPTION') => Promise<UnifiedTaskResult>;
+  cancelTaskStage: (taskId: string, stage: 'AUDIO_SOURCE' | 'TRANSCRIPTION') => Promise<UnifiedTaskResult>;
+  
+  // Recording Stage Operations - 录音阶段操作
   startRecording: (taskId?: string) => Promise<RecordingResult>;
   stopRecording: (taskId?: string) => Promise<RecordingResult>;
-  cancelRecording: () => Promise<RecordingResult>;
+  cancelRecording: (taskId?: string) => Promise<RecordingResult>;
   getCurrentRecordingTask: () => Promise<TaskResult>;
   onRecordingStatus: (callback: (status: { isRecording: boolean }) => void) => void;
   removeRecordingStatusListener: () => void;
+
+  // Transcription Stage Operations - 转录阶段操作
+  startTranscription: (taskId: string, options?: TranscriptionOptions) => Promise<UnifiedTaskResult>;
+  stopTranscription: (taskId: string) => Promise<UnifiedTaskResult>;
+  cancelTranscription: (taskId: string) => Promise<UnifiedTaskResult>;
+  getTranscriptionStatus: () => Promise<{ isTranscribing: boolean; activeCount: number; activeTaskIds: string[] }>;
+  
+  // Import Stage Operations - 导入阶段操作
+  importAudioFile: (taskId: string, filePath: string) => Promise<UnifiedTaskResult>;
 
   // Tray related methods
   onRecordingStart: (callback: () => void) => void;
@@ -108,14 +164,9 @@ export interface ElectronAPI {
   // App control methods
   quitApp: () => Promise<void>;
 
-  // Task related methods - 使用新的任务管理系统
-  createTask: (title: string) => Promise<TaskResult>;
-  updateTask: (id: string, updates: any) => Promise<TaskResult>;
-  getAllTasks: () => Promise<TaskResult>;
-  deleteTask: (id: string) => Promise<TaskResult>;
-
   // Task refresh event
   onTaskRefresh: (callback: () => void) => void;
+  removeTaskRefreshListener: () => void;
 
   // Whisper 配置相关方法
   getWhisperConfig: () => Promise<any>;
@@ -136,7 +187,15 @@ export interface ElectronAPI {
   onWhisperError: (callback: (error: any) => void) => void;
   removeWhisperListeners: () => void;
 
+  // File operations
   openAudioFile: (audioPath: string) => void;
+  selectAudioFile: () => Promise<{ success: boolean; filePath?: string; error?: string }>;
+  
+  // Transcription 事件监听方法
+  onTranscriptionProgress: (callback: (progress: any) => void) => void;
+  onTranscriptionComplete: (callback: (result: any) => void) => void;
+  onTranscriptionError: (callback: (error: any) => void) => void;
+  removeTranscriptionListeners: () => void;
 }
 
 interface Window {
@@ -148,11 +207,4 @@ interface ShortcutConfig {
   key: string;
   description: string;
   enabled: boolean;
-}
-
-interface AudioConfig {
-  sampleRate: number;
-  channels: number;
-  bitDepth: number;
-  format: string;
 } 

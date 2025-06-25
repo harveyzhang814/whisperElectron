@@ -1,7 +1,7 @@
-import { BaseTask } from './task';
+import { UnifiedTask } from './task';
 
 /**
- * Configuration for task concurrency control
+ * Configuration for unified task concurrency control
  */
 export interface ConcurrencyConfig {
   maxConcurrentTasks: number;
@@ -9,19 +9,20 @@ export interface ConcurrencyConfig {
 }
 
 /**
- * Task type specific concurrency settings
+ * Stage-specific concurrency settings
  */
-export interface TaskTypeConcurrencyConfig {
-  [taskType: string]: ConcurrencyConfig;
+export interface StageConcurrencyConfig {
+  [stage: string]: ConcurrencyConfig;
 }
 
 /**
  * Task queue entry with priority support
  */
 export interface QueuedTask {
-  task: BaseTask;
+  task: UnifiedTask;
   priority: number;
   queuedAt: number;
+  targetStage?: string; // Which stage this task is queued for
 }
 
 /**
@@ -35,14 +36,43 @@ export enum TaskPriority {
 }
 
 /**
- * Task queue interface
+ * Task queue interface for unified tasks
  */
 export interface TaskQueue {
-  enqueue(task: BaseTask, priority?: TaskPriority): void;
-  dequeue(): BaseTask | undefined;
-  peek(): BaseTask | undefined;
+  enqueue(task: UnifiedTask, priority?: TaskPriority, targetStage?: string): void;
+  dequeue(): QueuedTask | undefined;
+  peek(): QueuedTask | undefined;
   isEmpty(): boolean;
   size(): number;
   clear(): void;
   remove(taskId: string): boolean;
+  getTasksByStage(stage: string): QueuedTask[];
+}
+
+/**
+ * Stage-specific queue interface
+ */
+export interface StageQueue {
+  enqueue(task: UnifiedTask, priority?: TaskPriority): void;
+  dequeue(): QueuedTask | undefined;
+  peek(): QueuedTask | undefined;
+  isEmpty(): boolean;
+  size(): number;
+  clear(): void;
+  remove(taskId: string): boolean;
+}
+
+/**
+ * Multi-stage queue manager interface
+ */
+export interface MultiStageQueueManager {
+  enqueueForStage(task: UnifiedTask, stage: string, priority?: TaskPriority): void;
+  dequeueFromStage(stage: string): QueuedTask | undefined;
+  peekStage(stage: string): QueuedTask | undefined;
+  getStageQueue(stage: string): StageQueue;
+  getAllStages(): string[];
+  getQueueStats(): {
+    totalQueued: number;
+    stageStats: { [stage: string]: number };
+  };
 } 
