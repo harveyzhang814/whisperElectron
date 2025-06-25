@@ -193,11 +193,11 @@ export class SQLiteTaskStorage implements TaskStorageInterface {
               const { extendedData, ...baseMetadata } = parsedMetadata;
               
               return {
-                id: row.id,
-                type: row.type,
-                state: row.state as TaskState,
+              id: row.id,
+              type: row.type,
+              state: row.state as TaskState,
                 metadata: baseMetadata,
-                progress: row.progress,
+              progress: row.progress,
                 error: row.error ? JSON.parse(row.error) : undefined,
                 // Include extended data if available
                 ...(extendedData && { extendedData })

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Project Structure Refactoring**: Migrated experimental modules to main project structure
+  - Moved `src/main/experimental/managers/` to `src/main/managers/`
+  - Moved `src/main/experimental/storage/` to `src/main/storage/`
+  - Moved `src/main/experimental/types/` to `src/main/types/`
+  - Updated all import paths throughout the codebase
+  - Maintained backward compatibility during migration
+  - Verified build success and functionality after migration
+
 - **Whisper API Integration**: Complete integration with local Whisper Docker API
   - WhisperAPIClient class with full API compatibility
   - Support for audio transcription with multiple models (base, small)

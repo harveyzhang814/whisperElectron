@@ -1,11 +1,11 @@
 import { ipcMain } from 'electron';
 import { ShortcutManager } from './shortcut';
-import { FullTaskManager } from './experimental/managers/FullTaskManager';
-import { RecordingSubTaskManager } from './experimental/managers/RecordingSubTaskManager';
+import { FullTaskManager } from './managers/FullTaskManager';
+import { RecordingSubTaskManager } from './managers/RecordingSubTaskManager';
 import { quitApp } from './index';
 import { configManager } from './config';
 import { whisperManager } from './whisper/manager';
-import { TaskState, TaskMetadata } from './experimental/types/task';
+import { TaskState, TaskMetadata } from './types/task';
 
 // 全局任务管理器实例（在index.ts中初始化）
 let fullTaskManager: FullTaskManager | null = null;

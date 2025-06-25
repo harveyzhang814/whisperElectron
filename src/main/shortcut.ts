@@ -1,7 +1,7 @@
 import { globalShortcut, BrowserWindow } from 'electron';
-import { FullTaskManager } from './experimental/managers/FullTaskManager';
-import { RecordingSubTaskManager } from './experimental/managers/RecordingSubTaskManager';
-import { TaskMetadata } from './experimental/types/task';
+import { FullTaskManager } from './managers/FullTaskManager';
+import { RecordingSubTaskManager } from './managers/RecordingSubTaskManager';
+import { TaskMetadata } from './types/task';
 
 // 全局任务管理器实例（在index.ts中初始化）
 let fullTaskManager: FullTaskManager | null = null;

@@ -1,8 +1,8 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import path from 'path';
 import { ShortcutManager, setShortcutTaskManagers } from './shortcut';
-import { FullTaskManager } from './experimental/managers/FullTaskManager';
-import { RecordingSubTaskManager } from './experimental/managers/RecordingSubTaskManager';
+import { FullTaskManager } from './managers/FullTaskManager';
+import { RecordingSubTaskManager } from './managers/RecordingSubTaskManager';
 import { initializeIPC, setTaskManagers } from './ipc';
 
 let shortcutManager: ShortcutManager | null = null;

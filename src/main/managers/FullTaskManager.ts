@@ -199,12 +199,12 @@ export class FullTaskManager extends EventEmitter {
   public async getTask(taskId: string): Promise<BaseTask | undefined> {
     // First check if we have the task in memory
     let task = this.tasks.get(taskId);
-    
+
     // If not in memory, try to load from storage
     if (!task) {
-      const storedTask = await this.storage.loadTask(taskId);
-      if (storedTask) {
-        this.tasks.set(storedTask.id, storedTask);
+    const storedTask = await this.storage.loadTask(taskId);
+    if (storedTask) {
+      this.tasks.set(storedTask.id, storedTask);
         task = storedTask;
       }
     }

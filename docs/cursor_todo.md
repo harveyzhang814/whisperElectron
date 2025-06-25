@@ -1,3 +1,50 @@
+# 项目结构重构 ✅ 完成
+
+## 问题描述
+需要将 `src/main/experimental` 目录下的文件按照正确的项目结构迁移到主项目的合适位置，以改善代码组织和维护性。
+
+## 迁移计划
+
+### 1. 文件复制 ✅ 完成
+- [x] 创建 `src/main/storage` 目录
+- [x] 复制 `src/main/experimental/managers/` 到 `src/main/managers/`
+- [x] 复制 `src/main/experimental/storage/` 到 `src/main/storage/`
+- [x] 复制 `src/main/experimental/types/` 到 `src/main/types/`
+
+### 2. 引用路径更新 ✅ 完成
+- [x] 更新 `src/main/index.ts` 中的 import 路径
+- [x] 更新 `src/main/ipc.ts` 中的 import 路径
+- [x] 更新 `src/main/shortcut.ts` 中的 import 路径
+- [x] 检查并确认所有引用都已正确更新
+
+### 3. 验证和清理 ✅ 完成
+- [x] 运行构建测试确认无编译错误
+- [x] 确认所有文件都已正确迁移
+- [x] 删除旧的 `src/main/experimental` 目录
+- [x] 更新 CHANGELOG.md 记录迁移过程
+
+## 技术细节
+- **迁移策略**：先复制文件，再更新引用，最后删除旧文件
+- **路径映射**：
+  - `experimental/managers/` → `managers/`
+  - `experimental/storage/` → `storage/`
+  - `experimental/types/` → `types/`
+- **向后兼容**：确保所有功能在迁移后正常工作
+
+## 测试验证
+- [x] 构建成功，无 TypeScript 错误
+- [x] 所有 import 路径正确更新
+- [x] 项目结构更加清晰和规范
+- [x] 功能完整性得到保持
+
+## 影响评估
+- ✅ 改善了项目结构，提高了代码组织性
+- ✅ 简化了目录层次，便于维护
+- ✅ 保持了所有功能的完整性
+- ✅ 为后续开发提供了更好的基础结构
+
+---
+
 # 任务状态同步修复 ✅ 完成
 
 ## 问题描述
